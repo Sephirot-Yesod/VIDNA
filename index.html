@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plart - Your Personal Filter</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Welcome Screen -->
+    <section id="welcome-screen" class="screen active">
+        <button id="settings-btn" class="icon-btn settings-btn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+            </svg>
+        </button>
+        <div class="welcome-content">
+            <div class="logo-container">
+                <div class="logo-glow"></div>
+                <h1 class="logo">Plart</h1>
+            </div>
+            <p class="tagline">Discover your photo aesthetic</p>
+            <p class="description">Answer 5 personality questions and our AI will craft a filter that matches your unique visual style.</p>
+            <div class="ai-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <span>Powered by AI</span>
+            </div>
+            <button id="start-quiz-btn" class="primary-btn">
+                <span>Find My Filter</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+        <div class="floating-shapes">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+        </div>
+    </section>
+
+    <!-- Quiz Screen -->
+    <section id="quiz-screen" class="screen">
+        <div class="quiz-header">
+            <button id="quiz-back-btn" class="icon-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </button>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <span id="progress-text" class="progress-text">1 / 10</span>
+            </div>
+        </div>
+        
+        <div class="quiz-content">
+            <h2 id="question-text" class="question-text"></h2>
+            <div id="answers-container" class="answers-container">
+                <!-- Answer options will be dynamically inserted -->
+            </div>
+        </div>
+        
+        <div class="quiz-navigation">
+            <button id="prev-btn" class="nav-btn" disabled>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Previous
+            </button>
+            <button id="next-btn" class="nav-btn" disabled>
+                Next
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+    </section>
+
+    <!-- Loading/Generating Screen -->
+    <section id="generating-screen" class="screen">
+        <div class="generating-content">
+            <div class="loader">
+                <div class="loader-ring"></div>
+                <div class="loader-ring"></div>
+                <div class="loader-ring"></div>
+            </div>
+            <h2 class="generating-title">Crafting Your Filter</h2>
+            <p class="generating-text">AI is analyzing your personality...</p>
+        </div>
+    </section>
+
+    <!-- Camera Screen -->
+    <section id="camera-screen" class="screen">
+        <div class="camera-header">
+            <button id="camera-back-btn" class="icon-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </button>
+            <div class="filter-badge">
+                <span id="filter-name">Your Custom Filter</span>
+            </div>
+            <button id="toggle-params-btn" class="icon-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="camera-container">
+            <video id="camera-feed" autoplay playsinline></video>
+            <canvas id="filter-canvas"></canvas>
+            <canvas id="capture-canvas" style="display: none;"></canvas>
+        </div>
+
+        <div id="filter-params-panel" class="filter-params-panel hidden">
+            <h3>Your Filter Parameters</h3>
+            <div id="params-list" class="params-list">
+                <!-- Parameters will be displayed here -->
+            </div>
+        </div>
+
+        <div class="camera-controls">
+            <button id="flip-camera-btn" class="control-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 3h5v5M8 3H3v5M21 12a9 9 0 01-9 9m-9-9a9 9 0 019-9"/>
+                </svg>
+            </button>
+            <button id="capture-btn" class="capture-btn">
+                <div class="capture-btn-inner"></div>
+            </button>
+            <button id="retake-quiz-btn" class="control-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 4v6h6M23 20v-6h-6"/>
+                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+                </svg>
+            </button>
+        </div>
+    </section>
+
+    <!-- API Key Modal -->
+    <div id="api-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>OpenRouter API Key</h2>
+                <button id="close-modal-btn" class="icon-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Enter your OpenRouter API key to enable AI-powered filter generation. Your key is stored locally and only sent to OpenRouter.</p>
+                <div class="input-group">
+                    <label for="api-key-input">API Key</label>
+                    <input type="password" id="api-key-input" placeholder="sk-or-..." autocomplete="off">
+                </div>
+                <p class="hint">Get your key from <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a> · Or set it in <code>js/config.js</code></p>
+            </div>
+            <div class="modal-footer">
+                <button id="save-api-key-btn" class="primary-btn">Save Key</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Result Screen (Photo Preview) -->
+    <section id="result-screen" class="screen">
+        <div class="result-header">
+            <button id="result-back-btn" class="icon-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </button>
+            <h2 class="result-title">Your Photo</h2>
+            <div style="width: 44px;"></div>
+        </div>
+
+        <div class="result-content">
+            <div class="photo-container">
+                <img id="captured-photo" src="" alt="Captured photo">
+            </div>
+        </div>
+
+        <div class="result-actions">
+            <button id="retake-btn" class="secondary-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 4v6h6M23 20v-6h-6"/>
+                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+                </svg>
+                Retake
+            </button>
+            <button id="download-btn" class="primary-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                </svg>
+                Save Photo
+            </button>
+        </div>
+    </section>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/quiz.js"></script>
+    <script src="js/filterEngine.js"></script>
+    <script src="js/camera.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
+
