@@ -11,6 +11,38 @@ const Dashboard = (function() {
     // DOM Elements
     let elements = {};
 
+    // Default filter parameters
+    const DEFAULT_PARAMS = {
+        brightness: 1.0,
+        contrast: 1.0,
+        saturation: 1.0,
+        temperature: 0,
+        tint: 0,
+        grain: 0,
+        vignette: 0,
+        fade: 0
+    };
+
+    /**
+     * Ensure filter params are valid with defaults for any missing values
+     */
+    function ensureValidParams(params) {
+        if (!params || typeof params !== 'object') {
+            console.warn('Invalid params, using defaults');
+            return { ...DEFAULT_PARAMS };
+        }
+        return {
+            brightness: params.brightness ?? DEFAULT_PARAMS.brightness,
+            contrast: params.contrast ?? DEFAULT_PARAMS.contrast,
+            saturation: params.saturation ?? DEFAULT_PARAMS.saturation,
+            temperature: params.temperature ?? DEFAULT_PARAMS.temperature,
+            tint: params.tint ?? DEFAULT_PARAMS.tint,
+            grain: params.grain ?? DEFAULT_PARAMS.grain,
+            vignette: params.vignette ?? DEFAULT_PARAMS.vignette,
+            fade: params.fade ?? DEFAULT_PARAMS.fade
+        };
+    }
+
     /**
      * Initialize the dashboard module
      */
@@ -321,9 +353,16 @@ const Dashboard = (function() {
      */
     async function openFilterEdit(filterId) {
         const filter = await FilterStore.getFilter(filterId);
-        if (!filter) return;
+        if (!filter) {
+            console.error('Filter not found:', filterId);
+            return;
+        }
 
+        // Ensure params are valid
+        filter.params = ensureValidParams(filter.params);
         currentEditFilter = filter;
+        
+        console.log('Opening filter for edit:', filter.name, filter.params);
         
         if (elements.filterEditTitle) {
             elements.filterEditTitle.textContent = filter.name;
@@ -619,17 +658,26 @@ const Dashboard = (function() {
      * Handle text-based filter editing
      */
     async function handleTextEdit() {
-        if (!currentEditFilter || !elements.textEditInput) return;
+        if (!currentEditFilter || !elements.textEditInput) {
+            console.error('No filter selected or input element missing');
+            return;
+        }
 
         const instruction = elements.textEditInput.value.trim();
         if (!instruction) return;
+
+        // Ensure params are valid with defaults
+        const currentParams = ensureValidParams(currentEditFilter.params);
 
         elements.textEditBtn.disabled = true;
         elements.textEditBtn.classList.add('loading');
 
         try {
+            console.log('Refining filter with text:', instruction);
+            console.log('Current params:', currentParams);
+            
             const newParams = await FilterEngine.refineFilterWithText(
-                currentEditFilter.params,
+                currentParams,
                 instruction
             );
 
@@ -659,7 +707,13 @@ const Dashboard = (function() {
      * Handle style image upload
      */
     async function handleStyleImageUpload(file) {
-        if (!currentEditFilter) return;
+        if (!currentEditFilter) {
+            console.error('No filter selected for image style matching');
+            return;
+        }
+
+        // Ensure params are valid with defaults
+        const currentParams = ensureValidParams(currentEditFilter.params);
 
         elements.styleImageZone.classList.add('loading');
 
@@ -667,8 +721,10 @@ const Dashboard = (function() {
             // Convert file to base64
             const base64 = await fileToBase64(file);
 
+            console.log('Matching image style with current params:', currentParams);
+
             // Call AI to analyze image and adjust current filter params
-            const newParams = await FilterEngine.matchImageStyle(base64, currentEditFilter.params);
+            const newParams = await FilterEngine.matchImageStyle(base64, currentParams);
 
             // Update filter in database
             await FilterStore.updateFilter(currentEditFilter.id, {

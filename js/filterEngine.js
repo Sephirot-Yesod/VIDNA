@@ -194,46 +194,68 @@ Respond ONLY with valid JSON:
     /**
      * Call OpenRouter API to generate filter
      */
-    async function callGPT(prompt) {
+    async function callGPT(prompt, retries = 2) {
         const apiKey = getApiKey();
         
         if (!apiKey) {
             throw new Error('API key not set');
         }
 
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': window.location.origin,
-                'X-Title': 'Plart - Plant Photography Filter App'
-            },
-            body: JSON.stringify({
-                model: MODEL,
-                messages: [
-                    {
-                        role: 'system',
-                        content: 'You are an expert plant photography color grading specialist. Create tasteful, cohesive filters. Always respond with valid JSON only, no markdown formatting.'
+        let lastError;
+        
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+                if (attempt > 0) {
+                    console.log(`Retry attempt ${attempt}/${retries}...`);
+                    await new Promise(r => setTimeout(r, 1000 * attempt)); // Exponential backoff
+                }
+
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
+                        'HTTP-Referer': window.location.origin,
+                        'X-Title': 'Plart - Plant Photography Filter App'
                     },
-                    {
-                        role: 'user',
-                        content: prompt
-                    }
-                ],
-                temperature: 0.3,  // Conservative, consistent outputs
-                max_tokens: 250
-            })
-        });
+                    body: JSON.stringify({
+                        model: MODEL,
+                        messages: [
+                            {
+                                role: 'system',
+                                content: 'You are an expert plant photography color grading specialist. Create tasteful, cohesive filters. Always respond with valid JSON only, no markdown formatting.'
+                            },
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ],
+                        temperature: 0.3,  // Conservative, consistent outputs
+                        max_tokens: 250
+                    })
+                });
 
-        if (!response.ok) {
-            const error = await response.json();
-            console.error('OpenRouter API error:', error);
-            throw new Error(error.error?.message || `API request failed (${response.status})`);
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('OpenRouter API error:', error);
+                    throw new Error(error.error?.message || `API request failed (${response.status})`);
+                }
+
+                const data = await response.json();
+                return data.choices[0].message.content;
+                
+            } catch (error) {
+                lastError = error;
+                console.error(`API call attempt ${attempt + 1} failed:`, error.message);
+                
+                // Don't retry on auth errors
+                if (error.message.includes('401') || error.message.includes('403')) {
+                    throw error;
+                }
+            }
         }
-
-        const data = await response.json();
-        return data.choices[0].message.content;
+        
+        throw lastError;
     }
 
     /**
