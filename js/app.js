@@ -12,7 +12,6 @@ const App = (function() {
     // DOM Elements
     let screens = {};
     let buttons = {};
-    let modal = {};
 
     /**
      * Initialize the application
@@ -29,7 +28,6 @@ const App = (function() {
 
         buttons = {
             startQuiz: document.getElementById('start-quiz-btn'),
-            settings: document.getElementById('settings-btn'),
             quizBack: document.getElementById('quiz-back-btn'),
             cameraBack: document.getElementById('camera-back-btn'),
             toggleParams: document.getElementById('toggle-params-btn'),
@@ -41,14 +39,6 @@ const App = (function() {
             download: document.getElementById('download-btn')
         };
 
-        modal = {
-            container: document.getElementById('api-modal'),
-            backdrop: document.querySelector('.modal-backdrop'),
-            closeBtn: document.getElementById('close-modal-btn'),
-            input: document.getElementById('api-key-input'),
-            saveBtn: document.getElementById('save-api-key-btn')
-        };
-
         // Initialize modules
         Quiz.init();
         Camera.init();
@@ -58,16 +48,6 @@ const App = (function() {
 
         // Set up quiz completion callback
         Quiz.onComplete(handleQuizComplete);
-
-        // Load existing API key if present
-        if (FilterEngine.hasApiKey()) {
-            modal.input.value = '••••••••••••••••••••';
-        }
-
-        // Hide settings button if key is from config file
-        if (FilterEngine.isKeyFromConfig()) {
-            buttons.settings.style.display = 'none';
-        }
     }
 
     /**
@@ -76,21 +56,6 @@ const App = (function() {
     function setupEventListeners() {
         // Welcome screen
         buttons.startQuiz.addEventListener('click', handleStartQuiz);
-        buttons.settings.addEventListener('click', openModal);
-
-        // Modal
-        modal.closeBtn.addEventListener('click', closeModal);
-        modal.backdrop.addEventListener('click', closeModal);
-        modal.saveBtn.addEventListener('click', saveApiKey);
-        modal.input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') saveApiKey();
-        });
-        // Clear placeholder when focusing if it's masked
-        modal.input.addEventListener('focus', () => {
-            if (modal.input.value === '••••••••••••••••••••') {
-                modal.input.value = '';
-            }
-        });
 
         // Quiz screen
         buttons.quizBack.addEventListener('click', () => {
@@ -135,78 +100,8 @@ const App = (function() {
      * Handle start quiz button click
      */
     function handleStartQuiz() {
-        if (!FilterEngine.hasApiKey()) {
-            // Show modal to enter API key
-            openModal();
-            showError('Please enter your OpenAI API key to continue.');
-            return;
-        }
-
         showScreen('quiz');
         Quiz.reset();
-    }
-
-    /**
-     * Open API key modal
-     */
-    function openModal() {
-        modal.container.classList.remove('hidden');
-        clearError();
-        // Focus input after animation
-        setTimeout(() => modal.input.focus(), 100);
-    }
-
-    /**
-     * Close API key modal
-     */
-    function closeModal() {
-        modal.container.classList.add('hidden');
-    }
-
-    /**
-     * Save API key from modal
-     */
-    function saveApiKey() {
-        const key = modal.input.value.trim();
-        
-        if (!key) {
-            showError('Please enter an API key.');
-            return;
-        }
-
-        if (key.length < 10) {
-            showError('Invalid API key format. Please enter a valid OpenRouter key.');
-            return;
-        }
-
-        FilterEngine.setApiKey(key);
-        modal.input.value = '••••••••••••••••••••';
-        closeModal();
-        
-        // If user was trying to start quiz, continue
-        if (currentScreen === 'welcome') {
-            showScreen('quiz');
-            Quiz.reset();
-        }
-    }
-
-    /**
-     * Show error message in modal
-     */
-    function showError(message) {
-        clearError();
-        const errorEl = document.createElement('div');
-        errorEl.className = 'error-message';
-        errorEl.textContent = message;
-        modal.input.parentElement.insertAdjacentElement('beforebegin', errorEl);
-    }
-
-    /**
-     * Clear error message
-     */
-    function clearError() {
-        const existing = document.querySelector('.modal-body .error-message');
-        if (existing) existing.remove();
     }
 
     /**
