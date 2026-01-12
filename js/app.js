@@ -84,13 +84,13 @@ const App = (function() {
             Quiz.reset();
         });
 
-        // Result screen
-        buttons.resultBack.addEventListener('click', () => {
-            showScreen('camera');
+        // Result screen - go back to camera with same filter
+        buttons.resultBack.addEventListener('click', async () => {
+            await returnToCamera();
         });
 
-        buttons.retake.addEventListener('click', () => {
-            showScreen('camera');
+        buttons.retake.addEventListener('click', async () => {
+            await returnToCamera();
         });
 
         buttons.download.addEventListener('click', handleDownload);
@@ -251,6 +251,21 @@ const App = (function() {
             const capturedPhoto = document.getElementById('captured-photo');
             capturedPhoto.src = capturedPhotoUrl;
             showScreen('result');
+        }
+    }
+
+    /**
+     * Return to camera screen with filter preserved
+     */
+    async function returnToCamera() {
+        showScreen('camera');
+        
+        // If camera isn't active, restart it with the same filter
+        if (!Camera.isActive()) {
+            const cameraStarted = await Camera.start();
+            if (cameraStarted && currentFilter) {
+                Camera.setFilter(currentFilter);
+            }
         }
     }
 
