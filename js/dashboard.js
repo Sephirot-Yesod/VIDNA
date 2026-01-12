@@ -34,7 +34,32 @@ const Dashboard = (function() {
             styleImageInput: document.getElementById('style-image-input'),
             filterEditBackBtn: document.getElementById('filter-edit-back-btn'),
             filterDeleteBtn: document.getElementById('filter-delete-btn'),
-            useFilterCameraBtn: document.getElementById('use-filter-camera-btn')
+            useFilterCameraBtn: document.getElementById('use-filter-camera-btn'),
+            
+            // Advanced sliders
+            advancedToggle: document.getElementById('advanced-toggle'),
+            advancedSliders: document.getElementById('advanced-sliders'),
+            applySlidersBtn: document.getElementById('apply-sliders-btn'),
+            sliders: {
+                brightness: document.getElementById('slider-brightness'),
+                contrast: document.getElementById('slider-contrast'),
+                saturation: document.getElementById('slider-saturation'),
+                temperature: document.getElementById('slider-temperature'),
+                tint: document.getElementById('slider-tint'),
+                grain: document.getElementById('slider-grain'),
+                vignette: document.getElementById('slider-vignette'),
+                fade: document.getElementById('slider-fade')
+            },
+            sliderValues: {
+                brightness: document.getElementById('brightness-value'),
+                contrast: document.getElementById('contrast-value'),
+                saturation: document.getElementById('saturation-value'),
+                temperature: document.getElementById('temperature-value'),
+                tint: document.getElementById('tint-value'),
+                grain: document.getElementById('grain-value'),
+                vignette: document.getElementById('vignette-value'),
+                fade: document.getElementById('fade-value')
+            }
         };
 
         setupEventListeners();
@@ -130,6 +155,30 @@ const Dashboard = (function() {
                     handleStyleImageUpload(file);
                 }
             });
+        }
+
+        // Advanced toggle
+        if (elements.advancedToggle) {
+            elements.advancedToggle.addEventListener('click', () => {
+                elements.advancedSliders.classList.toggle('hidden');
+                elements.advancedToggle.classList.toggle('open');
+            });
+        }
+
+        // Sliders
+        Object.keys(elements.sliders).forEach(param => {
+            const slider = elements.sliders[param];
+            if (slider) {
+                slider.addEventListener('input', () => {
+                    updateSliderDisplay(param, slider.value);
+                    updatePreviewWithSliders();
+                });
+            }
+        });
+
+        // Apply sliders button
+        if (elements.applySlidersBtn) {
+            elements.applySlidersBtn.addEventListener('click', handleApplySliders);
         }
     }
 
@@ -281,9 +330,18 @@ const Dashboard = (function() {
         }
 
         updateEditParamsDisplay(filter.params);
+        setSliderValues(filter.params);
         loadPreviewImage();
         
-        App.showScreen('filter-edit');
+        // Reset advanced section state
+        if (elements.advancedSliders) {
+            elements.advancedSliders.classList.add('hidden');
+        }
+        if (elements.advancedToggle) {
+            elements.advancedToggle.classList.remove('open');
+        }
+        
+        App.showScreen('filterEdit');
     }
 
     /**
@@ -405,6 +463,159 @@ const Dashboard = (function() {
     }
 
     /**
+     * Update slider display value
+     */
+    function updateSliderDisplay(param, value) {
+        if (elements.sliderValues[param]) {
+            // Format display based on parameter type
+            if (param === 'temperature' || param === 'tint') {
+                elements.sliderValues[param].textContent = Math.round(value);
+            } else {
+                elements.sliderValues[param].textContent = parseFloat(value).toFixed(2);
+            }
+        }
+    }
+
+    /**
+     * Get current slider values
+     */
+    function getSliderValues() {
+        return {
+            brightness: parseFloat(elements.sliders.brightness?.value || 1),
+            contrast: parseFloat(elements.sliders.contrast?.value || 1),
+            saturation: parseFloat(elements.sliders.saturation?.value || 1),
+            temperature: parseFloat(elements.sliders.temperature?.value || 0),
+            tint: parseFloat(elements.sliders.tint?.value || 0),
+            grain: parseFloat(elements.sliders.grain?.value || 0),
+            vignette: parseFloat(elements.sliders.vignette?.value || 0),
+            fade: parseFloat(elements.sliders.fade?.value || 0)
+        };
+    }
+
+    /**
+     * Set slider values from filter params
+     */
+    function setSliderValues(params) {
+        Object.keys(elements.sliders).forEach(param => {
+            const slider = elements.sliders[param];
+            if (slider && params[param] !== undefined) {
+                slider.value = params[param];
+                updateSliderDisplay(param, params[param]);
+            }
+        });
+    }
+
+    /**
+     * Update preview with current slider values
+     */
+    function updatePreviewWithSliders() {
+        if (!elements.editPreviewCanvas) return;
+        
+        const params = getSliderValues();
+        loadPreviewImageWithParams(params);
+    }
+
+    /**
+     * Load preview image with specific params
+     */
+    function loadPreviewImageWithParams(params) {
+        if (!elements.editPreviewCanvas) return;
+
+        const canvas = elements.editPreviewCanvas;
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = 300;
+        canvas.height = 200;
+
+        // Draw a sample scene (gradient with some shapes)
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, '#87CEEB');
+        gradient.addColorStop(0.6, '#98D8C8');
+        gradient.addColorStop(1, '#2D5016');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Add some "plant" shapes
+        ctx.fillStyle = '#228B22';
+        ctx.beginPath();
+        ctx.ellipse(100, 180, 30, 50, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#32CD32';
+        ctx.beginPath();
+        ctx.ellipse(200, 170, 25, 45, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Apply filter
+        applyFilterToCanvas(ctx, canvas.width, canvas.height, params);
+    }
+
+    /**
+     * Handle apply sliders
+     */
+    async function handleApplySliders() {
+        if (!currentEditFilter) {
+            console.error('No filter selected for editing');
+            return;
+        }
+
+        const newParams = getSliderValues();
+        
+        elements.applySlidersBtn.disabled = true;
+        elements.applySlidersBtn.textContent = 'Saving...';
+
+        try {
+            // Check if user is logged in
+            if (!Auth.isLoggedIn()) {
+                throw new Error('Please sign in to save changes');
+            }
+
+            // Check if Supabase is configured
+            if (!Supabase.isConfigured()) {
+                // Save locally only - update UI without database
+                console.log('Supabase not configured, updating locally only');
+                currentEditFilter.params = newParams;
+                updateEditParamsDisplay(newParams);
+                elements.applySlidersBtn.textContent = 'Saved locally!';
+                setTimeout(() => {
+                    elements.applySlidersBtn.textContent = 'Apply Changes';
+                }, 1500);
+                return;
+            }
+
+            // Update filter in database
+            console.log('Updating filter:', currentEditFilter.id, newParams);
+            await FilterStore.updateFilter(currentEditFilter.id, {
+                name: currentEditFilter.name,
+                params: newParams,
+                source: 'manual'
+            });
+
+            // Update local state
+            currentEditFilter.params = newParams;
+            updateEditParamsDisplay(newParams);
+            
+            elements.applySlidersBtn.textContent = 'Saved!';
+            setTimeout(() => {
+                elements.applySlidersBtn.textContent = 'Apply Changes';
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Apply sliders error:', error);
+            alert('Failed to update filter: ' + (error.message || 'Unknown error'));
+        } finally {
+            elements.applySlidersBtn.disabled = false;
+            // Ensure button text is reset if not already set
+            setTimeout(() => {
+                if (elements.applySlidersBtn.textContent === 'Saving...') {
+                    elements.applySlidersBtn.textContent = 'Apply Changes';
+                }
+            }, 100);
+        }
+    }
+
+    /**
      * Handle text-based filter editing
      */
     async function handleTextEdit() {
@@ -456,8 +667,8 @@ const Dashboard = (function() {
             // Convert file to base64
             const base64 = await fileToBase64(file);
 
-            // Call AI to analyze image and generate filter params
-            const newParams = await FilterEngine.matchImageStyle(base64);
+            // Call AI to analyze image and adjust current filter params
+            const newParams = await FilterEngine.matchImageStyle(base64, currentEditFilter.params);
 
             // Update filter in database
             await FilterStore.updateFilter(currentEditFilter.id, {

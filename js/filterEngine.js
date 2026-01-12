@@ -496,32 +496,46 @@ Respond ONLY with valid JSON:
      * Refine an existing filter based on text instructions
      */
     async function refineFilterWithText(currentParams, instruction) {
-        const prompt = `You are a photo filter expert. The user has an existing filter and wants to modify it.
+        const prompt = `You are a photo filter expert. The user has an existing filter and wants to ADJUST it based on their feedback.
 
-CURRENT FILTER PARAMETERS:
-- brightness: ${currentParams.brightness} (1.0 = no change)
-- contrast: ${currentParams.contrast} (1.0 = no change)
-- saturation: ${currentParams.saturation} (1.0 = no change)
-- temperature: ${currentParams.temperature} (0 = neutral, negative = cooler/bluer, positive = warmer/yellower)
-- tint: ${currentParams.tint} (0 = neutral, negative = greener, positive = more magenta)
-- grain: ${currentParams.grain} (0 = none, up to 0.25)
-- vignette: ${currentParams.vignette} (0 = none, up to 0.35)
-- fade: ${currentParams.fade} (0 = none, up to 0.22)
+CURRENT FILTER PARAMETERS (these are the starting point):
+- brightness: ${currentParams.brightness}
+- contrast: ${currentParams.contrast}
+- saturation: ${currentParams.saturation}
+- temperature: ${currentParams.temperature}
+- tint: ${currentParams.tint}
+- grain: ${currentParams.grain}
+- vignette: ${currentParams.vignette}
+- fade: ${currentParams.fade}
 
-USER'S REQUEST: "${instruction}"
+USER'S ADJUSTMENT REQUEST: "${instruction}"
 
-Adjust the parameters based on the user's request. Make meaningful but not extreme changes.
+IMPORTANT: Make INCREMENTAL adjustments to the CURRENT values above. Do NOT start from scratch.
+- If they say "warmer", ADD to the current temperature (e.g., ${currentParams.temperature} + 5 to 15)
+- If they say "more contrast", INCREASE from current (e.g., ${currentParams.contrast} + 0.05 to 0.15)
+- Only change parameters relevant to their request
+- Keep other parameters UNCHANGED from their current values
 
-Respond ONLY with valid JSON (no markdown):
+Parameter ranges for reference:
+- brightness: 0.7 to 1.3
+- contrast: 0.7 to 1.3  
+- saturation: 0.7 to 1.4
+- temperature: -30 to +30
+- tint: -20 to +20
+- grain: 0 to 0.25
+- vignette: 0 to 0.35
+- fade: 0 to 0.22
+
+Respond ONLY with valid JSON containing the ADJUSTED values:
 {
-  "brightness": 1.0,
-  "contrast": 1.0,
-  "saturation": 1.0,
-  "temperature": 0,
-  "tint": 0,
-  "grain": 0,
-  "vignette": 0,
-  "fade": 0
+  "brightness": ${currentParams.brightness},
+  "contrast": ${currentParams.contrast},
+  "saturation": ${currentParams.saturation},
+  "temperature": ${currentParams.temperature},
+  "tint": ${currentParams.tint},
+  "grain": ${currentParams.grain},
+  "vignette": ${currentParams.vignette},
+  "fade": ${currentParams.fade}
 }`;
 
         try {
@@ -533,7 +547,8 @@ Respond ONLY with valid JSON (no markdown):
             
             console.log('=== REFINED FILTER ===');
             console.log('Instruction:', instruction);
-            console.log('New params:', newParams);
+            console.log('Original params:', currentParams);
+            console.log('Adjusted params:', newParams);
             console.log('======================');
             
             return newParams;
@@ -544,19 +559,43 @@ Respond ONLY with valid JSON (no markdown):
     }
 
     /**
-     * Analyze an image and generate filter parameters to match its style
+     * Analyze an image and adjust current filter parameters to incorporate its style
      * Uses GPT-4o Vision API
+     * @param {string} base64Image - Base64 encoded image
+     * @param {Object} currentParams - Current filter parameters to adjust
      */
-    async function matchImageStyle(base64Image) {
+    async function matchImageStyle(base64Image, currentParams = null) {
         const apiKey = getApiKey();
         
         if (!apiKey) {
             throw new Error('API key not set');
         }
 
-        const prompt = `Analyze this image's color grading, mood, and visual style. Then generate photo filter parameters that would recreate a similar look.
+        // Default params if none provided
+        const params = currentParams || {
+            brightness: 1.0,
+            contrast: 1.0,
+            saturation: 1.0,
+            temperature: 0,
+            tint: 0,
+            grain: 0,
+            vignette: 0,
+            fade: 0
+        };
 
-Consider:
+        const prompt = `Analyze this reference image's color grading, mood, and visual style. Then ADJUST the user's current filter to incorporate elements of this style.
+
+CURRENT FILTER PARAMETERS (starting point):
+- brightness: ${params.brightness}
+- contrast: ${params.contrast}
+- saturation: ${params.saturation}
+- temperature: ${params.temperature}
+- tint: ${params.tint}
+- grain: ${params.grain}
+- vignette: ${params.vignette}
+- fade: ${params.fade}
+
+Analyze the reference image for:
 - Overall brightness and exposure
 - Color temperature (warm/cool)
 - Saturation levels
@@ -564,26 +603,31 @@ Consider:
 - Any vintage/film effects (grain, fade)
 - Vignetting
 
-Generate filter parameters within these ranges:
-- brightness: 0.7 to 1.3 (1.0 = no change)
-- contrast: 0.7 to 1.3 (1.0 = no change)
-- saturation: 0.7 to 1.4 (1.0 = no change)
-- temperature: -30 to +30 (0 = neutral)
-- tint: -20 to +20 (0 = neutral)
-- grain: 0 to 0.25 (film grain effect)
-- vignette: 0 to 0.35 (edge darkening)
-- fade: 0 to 0.22 (lifted blacks/matte look)
+IMPORTANT: Make INCREMENTAL adjustments to blend the reference image's style INTO the current filter.
+- Don't completely replace the current values
+- Shift parameters TOWARD the reference style by 30-60% of the difference
+- Preserve some of the original filter's character
 
-Respond ONLY with valid JSON (no markdown):
+Parameter ranges:
+- brightness: 0.7 to 1.3
+- contrast: 0.7 to 1.3
+- saturation: 0.7 to 1.4
+- temperature: -30 to +30
+- tint: -20 to +20
+- grain: 0 to 0.25
+- vignette: 0 to 0.35
+- fade: 0 to 0.22
+
+Respond ONLY with valid JSON containing the BLENDED values:
 {
-  "brightness": 1.0,
-  "contrast": 1.0,
-  "saturation": 1.0,
-  "temperature": 0,
-  "tint": 0,
-  "grain": 0,
-  "vignette": 0,
-  "fade": 0
+  "brightness": ${params.brightness},
+  "contrast": ${params.contrast},
+  "saturation": ${params.saturation},
+  "temperature": ${params.temperature},
+  "tint": ${params.tint},
+  "grain": ${params.grain},
+  "vignette": ${params.vignette},
+  "fade": ${params.fade}
 }`;
 
         try {
@@ -633,7 +677,8 @@ Respond ONLY with valid JSON (no markdown):
             delete newParams.name;
             
             console.log('=== IMAGE STYLE MATCH ===');
-            console.log('Generated params:', newParams);
+            console.log('Original params:', params);
+            console.log('Blended params:', newParams);
             console.log('=========================');
             
             return newParams;

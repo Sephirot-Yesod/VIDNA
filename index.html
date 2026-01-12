@@ -22,12 +22,6 @@
             </div>
             <p class="tagline">Discover your photo aesthetic</p>
             <p class="description">Answer 5 personality questions and our AI will craft a filter that matches your unique visual style.</p>
-            <div class="ai-badge">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
-                <span>Powered by AI</span>
-            </div>
             <button id="start-quiz-btn" class="primary-btn">
                 <span>Find My Filter</span>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -184,6 +178,76 @@
                             <path d="M21 15l-5-5L5 21"/>
                         </svg>
                         <span>Drop image or click to upload</span>
+                    </div>
+                </div>
+
+                <div class="edit-section advanced-section">
+                    <button class="advanced-toggle" id="advanced-toggle">
+                        <span>Advanced Controls</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                    <div class="advanced-sliders hidden" id="advanced-sliders">
+                        <div class="slider-group">
+                            <label>
+                                <span class="slider-label">Brightness</span>
+                                <span class="slider-value" id="brightness-value">1.00</span>
+                            </label>
+                            <input type="range" id="slider-brightness" min="0.5" max="1.5" step="0.01" value="1">
+                        </div>
+                        <div class="slider-group">
+                            <label>
+                                <span class="slider-label">Contrast</span>
+                                <span class="slider-value" id="contrast-value">1.00</span>
+                            </label>
+                            <input type="range" id="slider-contrast" min="0.5" max="1.5" step="0.01" value="1">
+                        </div>
+                        <div class="slider-group">
+                            <label>
+                                <span class="slider-label">Saturation</span>
+                                <span class="slider-value" id="saturation-value">1.00</span>
+                            </label>
+                            <input type="range" id="slider-saturation" min="0" max="2" step="0.01" value="1">
+                        </div>
+                        <div class="slider-group">
+                            <label>
+                                <span class="slider-label">Temperature</span>
+                                <span class="slider-value" id="temperature-value">0</span>
+                            </label>
+                            <input type="range" id="slider-temperature" min="-30" max="30" step="1" value="0">
+                        </div>
+                        <div class="slider-group">
+                            <label>
+                                <span class="slider-label">Tint</span>
+                                <span class="slider-value" id="tint-value">0</span>
+                            </label>
+                            <input type="range" id="slider-tint" min="-20" max="20" step="1" value="0">
+                        </div>
+                        <div class="slider-group">
+                            <label>
+                                <span class="slider-label">Grain</span>
+                                <span class="slider-value" id="grain-value">0.00</span>
+                            </label>
+                            <input type="range" id="slider-grain" min="0" max="0.3" step="0.01" value="0">
+                        </div>
+                        <div class="slider-group">
+                            <label>
+                                <span class="slider-label">Vignette</span>
+                                <span class="slider-value" id="vignette-value">0.00</span>
+                            </label>
+                            <input type="range" id="slider-vignette" min="0" max="0.8" step="0.01" value="0">
+                        </div>
+                        <div class="slider-group">
+                            <label>
+                                <span class="slider-label">Fade</span>
+                                <span class="slider-value" id="fade-value">0.00</span>
+                            </label>
+                            <input type="range" id="slider-fade" min="0" max="0.3" step="0.01" value="0">
+                        </div>
+                        <button id="apply-sliders-btn" class="secondary-btn">
+                            Apply Changes
+                        </button>
                     </div>
                 </div>
             </div>
