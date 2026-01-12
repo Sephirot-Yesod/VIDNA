@@ -492,10 +492,163 @@ Respond ONLY with valid JSON:
         ];
     }
 
+    /**
+     * Refine an existing filter based on text instructions
+     */
+    async function refineFilterWithText(currentParams, instruction) {
+        const prompt = `You are a photo filter expert. The user has an existing filter and wants to modify it.
+
+CURRENT FILTER PARAMETERS:
+- brightness: ${currentParams.brightness} (1.0 = no change)
+- contrast: ${currentParams.contrast} (1.0 = no change)
+- saturation: ${currentParams.saturation} (1.0 = no change)
+- temperature: ${currentParams.temperature} (0 = neutral, negative = cooler/bluer, positive = warmer/yellower)
+- tint: ${currentParams.tint} (0 = neutral, negative = greener, positive = more magenta)
+- grain: ${currentParams.grain} (0 = none, up to 0.25)
+- vignette: ${currentParams.vignette} (0 = none, up to 0.35)
+- fade: ${currentParams.fade} (0 = none, up to 0.22)
+
+USER'S REQUEST: "${instruction}"
+
+Adjust the parameters based on the user's request. Make meaningful but not extreme changes.
+
+Respond ONLY with valid JSON (no markdown):
+{
+  "brightness": 1.0,
+  "contrast": 1.0,
+  "saturation": 1.0,
+  "temperature": 0,
+  "tint": 0,
+  "grain": 0,
+  "vignette": 0,
+  "fade": 0
+}`;
+
+        try {
+            const response = await callGPT(prompt);
+            const newParams = parseGPTResponse(response);
+            
+            // Remove the name field for param-only response
+            delete newParams.name;
+            
+            console.log('=== REFINED FILTER ===');
+            console.log('Instruction:', instruction);
+            console.log('New params:', newParams);
+            console.log('======================');
+            
+            return newParams;
+        } catch (error) {
+            console.error('Filter refinement failed:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Analyze an image and generate filter parameters to match its style
+     * Uses GPT-4o Vision API
+     */
+    async function matchImageStyle(base64Image) {
+        const apiKey = getApiKey();
+        
+        if (!apiKey) {
+            throw new Error('API key not set');
+        }
+
+        const prompt = `Analyze this image's color grading, mood, and visual style. Then generate photo filter parameters that would recreate a similar look.
+
+Consider:
+- Overall brightness and exposure
+- Color temperature (warm/cool)
+- Saturation levels
+- Contrast and tonal range
+- Any vintage/film effects (grain, fade)
+- Vignetting
+
+Generate filter parameters within these ranges:
+- brightness: 0.7 to 1.3 (1.0 = no change)
+- contrast: 0.7 to 1.3 (1.0 = no change)
+- saturation: 0.7 to 1.4 (1.0 = no change)
+- temperature: -30 to +30 (0 = neutral)
+- tint: -20 to +20 (0 = neutral)
+- grain: 0 to 0.25 (film grain effect)
+- vignette: 0 to 0.35 (edge darkening)
+- fade: 0 to 0.22 (lifted blacks/matte look)
+
+Respond ONLY with valid JSON (no markdown):
+{
+  "brightness": 1.0,
+  "contrast": 1.0,
+  "saturation": 1.0,
+  "temperature": 0,
+  "tint": 0,
+  "grain": 0,
+  "vignette": 0,
+  "fade": 0
+}`;
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'HTTP-Referer': window.location.origin,
+                    'X-Title': 'Plart - Plant Photography Filter App'
+                },
+                body: JSON.stringify({
+                    model: MODEL,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: prompt
+                                },
+                                {
+                                    type: 'image_url',
+                                    image_url: {
+                                        url: base64Image
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    temperature: 0.3,
+                    max_tokens: 300
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                console.error('OpenRouter Vision API error:', error);
+                throw new Error(error.error?.message || `API request failed (${response.status})`);
+            }
+
+            const data = await response.json();
+            const responseText = data.choices[0].message.content;
+            const newParams = parseGPTResponse(responseText);
+            
+            // Remove the name field
+            delete newParams.name;
+            
+            console.log('=== IMAGE STYLE MATCH ===');
+            console.log('Generated params:', newParams);
+            console.log('=========================');
+            
+            return newParams;
+        } catch (error) {
+            console.error('Image style matching failed:', error);
+            throw error;
+        }
+    }
+
     // Public API
     return {
         calculateFilter,
         calculateFilterFallback,
+        refineFilterWithText,
+        matchImageStyle,
         toCSSFilter,
         generateFilterName,
         getParameterDisplay,

@@ -6,12 +6,15 @@
 const App = (function() {
     // State
     let currentScreen = 'welcome';
+    let previousScreen = null;
     let currentFilter = null;
+    let currentFilterName = null;
     let capturedPhotoUrl = null;
 
     // DOM Elements
     let screens = {};
     let buttons = {};
+    let modal = {};
 
     /**
      * Initialize the application
@@ -20,6 +23,10 @@ const App = (function() {
         // Cache DOM elements
         screens = {
             welcome: document.getElementById('welcome-screen'),
+            auth: document.getElementById('auth-screen'),
+            dashboard: document.getElementById('dashboard-screen'),
+            filterEdit: document.getElementById('filter-edit-screen'),
+            photoEditor: document.getElementById('photo-editor-screen'),
             quiz: document.getElementById('quiz-screen'),
             generating: document.getElementById('generating-screen'),
             camera: document.getElementById('camera-screen'),
@@ -27,27 +34,51 @@ const App = (function() {
         };
 
         buttons = {
+            // Welcome
             startQuiz: document.getElementById('start-quiz-btn'),
+            welcomeAuth: document.getElementById('welcome-auth-btn'),
+            myFilters: document.getElementById('my-filters-btn'),
+            // Quiz
             quizBack: document.getElementById('quiz-back-btn'),
+            // Camera
             cameraBack: document.getElementById('camera-back-btn'),
             toggleParams: document.getElementById('toggle-params-btn'),
             flipCamera: document.getElementById('flip-camera-btn'),
             capture: document.getElementById('capture-btn'),
+            saveFilter: document.getElementById('save-filter-btn'),
             retakeQuiz: document.getElementById('retake-quiz-btn'),
+            // Result
             resultBack: document.getElementById('result-back-btn'),
             retake: document.getElementById('retake-btn'),
             download: document.getElementById('download-btn')
         };
 
+        modal = {
+            container: document.getElementById('save-filter-modal'),
+            closeBtn: document.getElementById('save-modal-close-btn'),
+            nameInput: document.getElementById('filter-name-input'),
+            confirmBtn: document.getElementById('save-filter-confirm-btn'),
+            error: document.getElementById('save-filter-error')
+        };
+
+        // Initialize Supabase first
+        Supabase.init();
+
         // Initialize modules
+        Auth.init();
         Quiz.init();
         Camera.init();
+        Dashboard.init();
+        PhotoEditor.init();
 
         // Set up event listeners
         setupEventListeners();
 
         // Set up quiz completion callback
         Quiz.onComplete(handleQuizComplete);
+
+        // Listen for auth state changes
+        Auth.onAuthStateChange(handleAuthStateChange);
     }
 
     /**
@@ -55,45 +86,122 @@ const App = (function() {
      */
     function setupEventListeners() {
         // Welcome screen
-        buttons.startQuiz.addEventListener('click', handleStartQuiz);
+        if (buttons.startQuiz) {
+            buttons.startQuiz.addEventListener('click', handleStartQuiz);
+        }
+        
+        if (buttons.welcomeAuth) {
+            buttons.welcomeAuth.addEventListener('click', () => {
+                if (Auth.isLoggedIn()) {
+                    showScreen('dashboard');
+                    Dashboard.loadFilters();
+                } else {
+                    showScreen('auth');
+                }
+            });
+        }
+
+        if (buttons.myFilters) {
+            buttons.myFilters.addEventListener('click', () => {
+                showScreen('dashboard');
+                Dashboard.loadFilters();
+            });
+        }
 
         // Quiz screen
-        buttons.quizBack.addEventListener('click', () => {
-            showScreen('welcome');
-        });
+        if (buttons.quizBack) {
+            buttons.quizBack.addEventListener('click', () => {
+                showScreen('welcome');
+            });
+        }
 
         // Camera screen
-        buttons.cameraBack.addEventListener('click', async () => {
-            Camera.stop();
-            showScreen('quiz');
-        });
+        if (buttons.cameraBack) {
+            buttons.cameraBack.addEventListener('click', async () => {
+                Camera.stop();
+                // Go back to where we came from
+                if (previousScreen === 'dashboard' || previousScreen === 'filter-edit') {
+                    showScreen('dashboard');
+                } else {
+                    showScreen('welcome');
+                }
+            });
+        }
 
-        buttons.toggleParams.addEventListener('click', () => {
-            Camera.toggleParamsPanel();
-        });
+        if (buttons.toggleParams) {
+            buttons.toggleParams.addEventListener('click', () => {
+                Camera.toggleParamsPanel();
+            });
+        }
 
-        buttons.flipCamera.addEventListener('click', async () => {
-            await Camera.flip();
-        });
+        if (buttons.flipCamera) {
+            buttons.flipCamera.addEventListener('click', async () => {
+                await Camera.flip();
+            });
+        }
 
-        buttons.capture.addEventListener('click', handleCapture);
+        if (buttons.capture) {
+            buttons.capture.addEventListener('click', handleCapture);
+        }
 
-        buttons.retakeQuiz.addEventListener('click', () => {
-            Camera.stop();
-            showScreen('quiz');
-            Quiz.reset();
-        });
+        if (buttons.saveFilter) {
+            buttons.saveFilter.addEventListener('click', handleSaveFilterClick);
+        }
 
-        // Result screen - go back to camera with same filter
-        buttons.resultBack.addEventListener('click', async () => {
-            await returnToCamera();
-        });
+        if (buttons.retakeQuiz) {
+            buttons.retakeQuiz.addEventListener('click', () => {
+                Camera.stop();
+                showScreen('quiz');
+                Quiz.reset();
+            });
+        }
 
-        buttons.retake.addEventListener('click', async () => {
-            await returnToCamera();
-        });
+        // Result screen
+        if (buttons.resultBack) {
+            buttons.resultBack.addEventListener('click', async () => {
+                await returnToCamera();
+            });
+        }
 
-        buttons.download.addEventListener('click', handleDownload);
+        if (buttons.retake) {
+            buttons.retake.addEventListener('click', async () => {
+                await returnToCamera();
+            });
+        }
+
+        if (buttons.download) {
+            buttons.download.addEventListener('click', handleDownload);
+        }
+
+        // Save filter modal
+        if (modal.closeBtn) {
+            modal.closeBtn.addEventListener('click', closeSaveModal);
+        }
+        
+        if (modal.container) {
+            modal.container.querySelector('.modal-backdrop')?.addEventListener('click', closeSaveModal);
+        }
+
+        if (modal.confirmBtn) {
+            modal.confirmBtn.addEventListener('click', handleSaveFilterConfirm);
+        }
+
+        if (modal.nameInput) {
+            modal.nameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleSaveFilterConfirm();
+            });
+        }
+    }
+
+    /**
+     * Handle auth state changes
+     */
+    function handleAuthStateChange(user) {
+        // Update UI based on auth state
+        if (user && currentScreen === 'auth') {
+            showScreen('dashboard');
+            Dashboard.loadFilters();
+        }
     }
 
     /**
@@ -109,15 +217,25 @@ const App = (function() {
      * @param {string} screenName - Name of the screen to show
      */
     function showScreen(screenName) {
+        // Store previous screen
+        previousScreen = currentScreen;
+
         // Hide all screens
         Object.values(screens).forEach(screen => {
-            screen.classList.remove('active');
+            if (screen) screen.classList.remove('active');
         });
 
         // Show target screen
         if (screens[screenName]) {
             screens[screenName].classList.add('active');
             currentScreen = screenName;
+        }
+
+        // Handle screen-specific logic
+        if (screenName === 'dashboard') {
+            Dashboard.loadFilters();
+        } else if (screenName === 'photo-editor') {
+            PhotoEditor.loadFilterOptions();
         }
     }
 
@@ -140,6 +258,7 @@ const App = (function() {
             
             // Call GPT to generate filter
             currentFilter = await FilterEngine.calculateFilter(results, questions);
+            currentFilterName = currentFilter.name || 'Custom Filter';
             
             generatingText.textContent = 'Starting camera...';
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -177,6 +296,7 @@ const App = (function() {
                 generatingText.textContent = 'Using fallback algorithm...';
                 
                 currentFilter = FilterEngine.calculateFilterFallback(results);
+                currentFilterName = 'Natural Light';
                 
                 await new Promise(resolve => setTimeout(resolve, 500));
                 generatingText.textContent = 'Starting camera...';
@@ -255,6 +375,78 @@ const App = (function() {
     }
 
     /**
+     * Handle save filter button click
+     */
+    function handleSaveFilterClick() {
+        if (!Auth.isLoggedIn()) {
+            // Show auth screen
+            alert('Please sign in to save filters');
+            showScreen('auth');
+            return;
+        }
+
+        // Open save modal
+        openSaveModal();
+    }
+
+    /**
+     * Open save filter modal
+     */
+    function openSaveModal() {
+        if (!modal.container) return;
+        
+        modal.container.classList.remove('hidden');
+        modal.nameInput.value = currentFilterName || FilterEngine.generateFilterName(currentFilter);
+        modal.error.classList.add('hidden');
+        
+        setTimeout(() => modal.nameInput.focus(), 100);
+    }
+
+    /**
+     * Close save filter modal
+     */
+    function closeSaveModal() {
+        if (modal.container) {
+            modal.container.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Handle save filter confirm
+     */
+    async function handleSaveFilterConfirm() {
+        const name = modal.nameInput.value.trim();
+        
+        if (!name) {
+            modal.error.textContent = 'Please enter a filter name';
+            modal.error.classList.remove('hidden');
+            return;
+        }
+
+        modal.confirmBtn.disabled = true;
+        modal.confirmBtn.textContent = 'Saving...';
+
+        try {
+            await FilterStore.saveFilter(name, currentFilter, 'quiz');
+            closeSaveModal();
+            
+            // Show success feedback
+            const saveBtn = buttons.saveFilter;
+            if (saveBtn) {
+                saveBtn.classList.add('saved');
+                setTimeout(() => saveBtn.classList.remove('saved'), 2000);
+            }
+        } catch (error) {
+            console.error('Save filter error:', error);
+            modal.error.textContent = error.message || 'Failed to save filter';
+            modal.error.classList.remove('hidden');
+        } finally {
+            modal.confirmBtn.disabled = false;
+            modal.confirmBtn.textContent = 'Save Filter';
+        }
+    }
+
+    /**
      * Return to camera screen with filter preserved
      */
     async function returnToCamera() {
@@ -280,7 +472,7 @@ const App = (function() {
         link.href = capturedPhotoUrl;
         
         // Generate filename with filter name
-        const filterName = FilterEngine.generateFilterName(currentFilter)
+        const filterName = (currentFilterName || FilterEngine.generateFilterName(currentFilter))
             .toLowerCase()
             .replace(/\s+/g, '-');
         const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
@@ -290,6 +482,14 @@ const App = (function() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }
+
+    /**
+     * Set current filter (used by dashboard when selecting a saved filter)
+     */
+    function setCurrentFilter(params, name) {
+        currentFilter = params;
+        currentFilterName = name;
     }
 
     /**
@@ -310,6 +510,7 @@ const App = (function() {
     return {
         init,
         showScreen,
+        setCurrentFilter,
         getFilter,
         getCurrentScreen
     };
