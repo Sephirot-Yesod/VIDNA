@@ -37,9 +37,16 @@ const FilterEngine = (function() {
      */
     function getApiKey() {
         if (typeof CONFIG !== 'undefined' && CONFIG.OPENROUTER_API_KEY && CONFIG.OPENROUTER_API_KEY.length > 10) {
+            console.log('API key loaded from config.js (length:', CONFIG.OPENROUTER_API_KEY.length, ')');
             return CONFIG.OPENROUTER_API_KEY;
         }
-        return localStorage.getItem('plart_openrouter_key');
+        const localKey = localStorage.getItem('plart_openrouter_key');
+        if (localKey) {
+            console.log('API key loaded from localStorage');
+            return localKey;
+        }
+        console.warn('No API key found in config.js or localStorage');
+        return null;
     }
 
     /**
@@ -221,7 +228,8 @@ Respond ONLY with valid JSON:
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error?.message || 'API request failed');
+            console.error('OpenRouter API error:', error);
+            throw new Error(error.error?.message || `API request failed (${response.status})`);
         }
 
         const data = await response.json();
