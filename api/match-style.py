@@ -85,11 +85,26 @@ Respond ONLY with valid JSON:
 
 def parse_response(response_text: str) -> dict:
     """Parse and validate GPT response"""
+    if not response_text or not response_text.strip():
+        raise Exception("Empty response text received")
+    
     cleaned = response_text.strip()
     if cleaned.startswith("```"):
         cleaned = cleaned.replace("```json", "").replace("```", "").strip()
     
-    parsed = json.loads(cleaned)
+    # Try to extract JSON from the response if it contains other text
+    if not cleaned.startswith("{"):
+        start = cleaned.find("{")
+        end = cleaned.rfind("}") + 1
+        if start != -1 and end > start:
+            cleaned = cleaned[start:end]
+        else:
+            raise Exception(f"No JSON object found in response: {response_text[:500]}")
+    
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError as e:
+        raise Exception(f"JSON parse error: {e}. Content: {cleaned[:500]}")
     
     return {
         "brightness": round(clamp_value(parsed.get("brightness", 1.0), RANGES["brightness"]), 2),
@@ -124,7 +139,8 @@ def call_openrouter_vision(prompt: str, base64_image: str, api_key: str) -> str:
             }
         ],
         "temperature": 0.3,
-        "max_tokens": 300
+        "max_tokens": 500,
+        "reasoning": {"effort": "low"}
     }).encode('utf-8')
     
     req = urllib.request.Request(API_URL, data=data, headers=headers, method='POST')
