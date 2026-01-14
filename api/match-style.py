@@ -11,7 +11,7 @@ import urllib.error
 
 # OpenRouter API configuration
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "google/gemini-2.0-flash-001"
+MODEL = "google/gemini-3-pro-preview"
 
 # Parameter ranges for validation - expanded for more creative freedom
 RANGES = {
@@ -129,7 +129,7 @@ def call_openrouter_vision(prompt: str, base64_image: str, api_key: str) -> str:
     
     req = urllib.request.Request(API_URL, data=data, headers=headers, method='POST')
     
-    with urllib.request.urlopen(req, timeout=90) as response:
+    with urllib.request.urlopen(req, timeout=120) as response:
         response_body = response.read().decode('utf-8')
         result = json.loads(response_body)
         
@@ -139,9 +139,20 @@ def call_openrouter_vision(prompt: str, base64_image: str, api_key: str) -> str:
         if "choices" not in result or len(result["choices"]) == 0:
             raise Exception(f"No choices in response: {response_body[:500]}")
         
-        content = result["choices"][0]["message"]["content"]
+        message = result["choices"][0]["message"]
+        content = message.get("content", "")
+        
+        # For reasoning models, content might be in reasoning_details
+        if not content and "reasoning_details" in message:
+            reasoning = message.get("reasoning_details", [])
+            if reasoning and len(reasoning) > 0:
+                content = reasoning[-1].get("content", "")
+        
+        if not content and "reasoning" in message:
+            content = message.get("reasoning", "")
+        
         if not content:
-            raise Exception("Empty content in response")
+            raise Exception(f"Empty content. Response: {json.dumps(result)[:1000]}")
         
         return content
 
