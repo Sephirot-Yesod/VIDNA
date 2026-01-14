@@ -1,6 +1,6 @@
-# Plart API Documentation
+# VIDNA API Documentation
 
-This document describes the REST API endpoints for the Plart photo filter application.
+This document describes the REST API endpoints for the VIDNA photo filter application.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ This document describes the REST API endpoints for the Plart photo filter applic
 
 ### Base URL
 
-- **Production**: `https://your-app.vercel.app`
+- **Production**: `https://vidna.vercel.app`
 - **Development**: `http://localhost:3000`
 
 All API paths are prefixed with `/api`.
@@ -93,7 +93,7 @@ For production deployments with rate limiting, consider adding JWT authenticatio
 
 **Endpoint**: `POST /api/generate-filter`
 
-**Description**: Generate photo filter parameters based on personality quiz answers using GPT-4o.
+**Description**: Generate photo filter parameters based on personality quiz answers using Google Gemini 3 Pro.
 
 **Request Body**:
 
@@ -150,7 +150,7 @@ For production deployments with rate limiting, consider adding JWT authenticatio
 **Example**:
 
 ```bash
-curl -X POST https://your-app.vercel.app/api/generate-filter \
+curl -X POST https://vidna.vercel.app/api/generate-filter \
   -H "Content-Type: application/json" \
   -d '{
     "quizResults": [{"questionId": 1, "answer": 2, "affects": ["brightness"]}],
@@ -166,7 +166,7 @@ curl -X POST https://your-app.vercel.app/api/generate-filter \
 
 **Endpoint**: `POST /api/refine-filter`
 
-**Description**: Adjust existing filter parameters based on natural language instructions using GPT-4o.
+**Description**: Adjust existing filter parameters based on natural language instructions using Google Gemini 3 Pro.
 
 **Request Body**:
 
@@ -219,7 +219,7 @@ curl -X POST https://your-app.vercel.app/api/generate-filter \
 **Example**:
 
 ```bash
-curl -X POST https://your-app.vercel.app/api/refine-filter \
+curl -X POST https://vidna.vercel.app/api/refine-filter \
   -H "Content-Type: application/json" \
   -d '{
     "currentParams": {"brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "temperature": 0, "tint": 0, "grain": 0, "vignette": 0, "fade": 0},
@@ -235,7 +235,7 @@ curl -X POST https://your-app.vercel.app/api/refine-filter \
 
 **Endpoint**: `POST /api/match-style`
 
-**Description**: Analyze a reference image and adjust filter parameters to match its visual style using GPT-4o Vision.
+**Description**: Analyze a reference image and adjust filter parameters to match its visual style using Google Gemini 3 Pro Vision.
 
 **Request Body**:
 
@@ -293,7 +293,7 @@ curl -X POST https://your-app.vercel.app/api/refine-filter \
 # First, convert image to base64
 BASE64_IMAGE=$(base64 -i reference.jpg)
 
-curl -X POST https://your-app.vercel.app/api/match-style \
+curl -X POST https://vidna.vercel.app/api/match-style \
   -H "Content-Type: application/json" \
   -d "{
     \"currentParams\": {\"brightness\": 1.0, \"contrast\": 1.0, \"saturation\": 1.0, \"temperature\": 0, \"tint\": 0, \"grain\": 0, \"vignette\": 0, \"fade\": 0},
@@ -309,14 +309,14 @@ curl -X POST https://your-app.vercel.app/api/match-style \
 
 | Parameter | Type | Range | Default | Description |
 |-----------|------|-------|---------|-------------|
-| `brightness` | float | 0.85 - 1.15 | 1.0 | Image brightness (1.0 = no change) |
-| `contrast` | float | 0.85 - 1.2 | 1.0 | Tonal contrast (1.0 = no change) |
-| `saturation` | float | 0.7 - 1.4 | 1.0 | Color intensity (1.0 = no change) |
-| `temperature` | int | -20 to +20 | 0 | Color temperature (negative = cool, positive = warm) |
-| `tint` | int | -10 to +10 | 0 | Green/Magenta shift (negative = green, positive = magenta) |
-| `grain` | float | 0 - 0.15 | 0 | Film grain overlay intensity |
-| `vignette` | float | 0 - 0.35 | 0 | Edge darkening intensity |
-| `fade` | float | 0 - 0.12 | 0 | Black level lift (matte effect) |
+| `brightness` | float | 0.6 - 1.5 | 1.0 | Image brightness (1.0 = no change) |
+| `contrast` | float | 0.6 - 1.5 | 1.0 | Tonal contrast (1.0 = no change) |
+| `saturation` | float | 0.3 - 1.8 | 1.0 | Color intensity (1.0 = no change) |
+| `temperature` | int | -40 to +40 | 0 | Color temperature (negative = cool, positive = warm) |
+| `tint` | int | -25 to +25 | 0 | Green/Magenta shift (negative = green, positive = magenta) |
+| `grain` | float | 0 - 0.4 | 0 | Film grain overlay intensity |
+| `vignette` | float | 0 - 0.6 | 0 | Edge darkening intensity |
+| `fade` | float | 0 - 0.35 | 0 | Black level lift (matte effect) |
 
 ### Parameter Effects
 
@@ -451,7 +451,7 @@ const { data, error } = await supabase
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPENROUTER_API_KEY` | Yes | OpenRouter API key for GPT-4o access |
+| `OPENROUTER_API_KEY` | Yes | OpenRouter API key for Gemini 3 Pro access |
 | `SUPABASE_URL` | Yes | Supabase project URL |
 | `SUPABASE_ANON_KEY` | Yes | Supabase anonymous/public key |
 
@@ -500,21 +500,21 @@ curl -X POST http://localhost:3000/api/refine-filter \
 
 | Endpoint | Timeout | Notes |
 |----------|---------|-------|
-| `/api/generate-filter` | 60s | Complex prompt, may take 5-15s |
-| `/api/refine-filter` | 60s | Simpler prompt, usually 3-8s |
-| `/api/match-style` | 90s | Vision API, 5-15s depending on image |
+| `/api/generate-filter` | 90s | Reasoning model, may take 10-30s |
+| `/api/refine-filter` | 90s | Reasoning model, usually 5-15s |
+| `/api/match-style` | 120s | Vision + reasoning, 10-30s depending on image |
 
 ---
 
 ## Version Information
 
-- **Document Version**: 1.0.0
-- **API Version**: 1.0.0
+- **Document Version**: 1.1.0
+- **API Version**: 1.1.0
 - **Last Updated**: 2026-01-14
-- **AI Model**: `openai/gpt-4o` via OpenRouter
+- **AI Model**: `google/gemini-3-pro-preview` via [OpenRouter](https://openrouter.ai/google/gemini-3-pro-preview)
 
 ---
 
 ## Contact
 
-For issues or questions, please open a GitHub issue.
+For issues or questions, please open a GitHub issue on [VIDNA](https://github.com/Sephirot-Yesod/VIDNA).
