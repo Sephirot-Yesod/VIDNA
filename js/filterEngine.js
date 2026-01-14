@@ -16,16 +16,16 @@ const FilterEngine = (function() {
         fade: 0
     };
 
-    // Parameter ranges - subtle, never drastic
+    // Parameter ranges - expanded for creative freedom
     const ranges = {
-        brightness: { min: 0.85, max: 1.15 },
-        contrast: { min: 0.85, max: 1.2 },
-        saturation: { min: 0.7, max: 1.4 },
-        temperature: { min: -20, max: 20 },
-        tint: { min: -10, max: 10 },
-        grain: { min: 0, max: 0.15 },
-        vignette: { min: 0, max: 0.35 },
-        fade: { min: 0, max: 0.12 }
+        brightness: { min: 0.6, max: 1.5 },
+        contrast: { min: 0.6, max: 1.5 },
+        saturation: { min: 0.3, max: 1.8 },
+        temperature: { min: -40, max: 40 },
+        tint: { min: -25, max: 25 },
+        grain: { min: 0, max: 0.4 },
+        vignette: { min: 0, max: 0.6 },
+        fade: { min: 0, max: 0.35 }
     };
 
     // API endpoints (relative URLs for Vercel serverless functions)

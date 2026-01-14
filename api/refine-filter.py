@@ -13,16 +13,16 @@ import urllib.error
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "google/gemini-3-pro-preview"
 
-# Parameter ranges for validation
+# Parameter ranges for validation - expanded for more creative freedom
 RANGES = {
-    "brightness": {"min": 0.85, "max": 1.15},
-    "contrast": {"min": 0.85, "max": 1.2},
-    "saturation": {"min": 0.7, "max": 1.4},
-    "temperature": {"min": -20, "max": 20},
-    "tint": {"min": -10, "max": 10},
-    "grain": {"min": 0, "max": 0.15},
-    "vignette": {"min": 0, "max": 0.35},
-    "fade": {"min": 0, "max": 0.12}
+    "brightness": {"min": 0.6, "max": 1.5},
+    "contrast": {"min": 0.6, "max": 1.5},
+    "saturation": {"min": 0.3, "max": 1.8},
+    "temperature": {"min": -40, "max": 40},
+    "tint": {"min": -25, "max": 25},
+    "grain": {"min": 0, "max": 0.4},
+    "vignette": {"min": 0, "max": 0.6},
+    "fade": {"min": 0, "max": 0.35}
 }
 
 
@@ -55,15 +55,15 @@ IMPORTANT: Make INCREMENTAL adjustments to the CURRENT values above. Do NOT star
 - Only change parameters relevant to their request
 - Keep other parameters UNCHANGED from their current values
 
-Parameter ranges:
-- brightness: 0.7 to 1.3
-- contrast: 0.7 to 1.3  
-- saturation: 0.7 to 1.4
-- temperature: -30 to +30
-- tint: -20 to +20
-- grain: 0 to 0.25
-- vignette: 0 to 0.35
-- fade: 0 to 0.22
+Parameter ranges (use full range when appropriate):
+- brightness: 0.6 to 1.5
+- contrast: 0.6 to 1.5  
+- saturation: 0.3 to 1.8
+- temperature: -40 to +40
+- tint: -25 to +25
+- grain: 0 to 0.4
+- vignette: 0 to 0.6
+- fade: 0 to 0.35
 
 Respond ONLY with valid JSON:
 {{

@@ -28,15 +28,15 @@ USER'S ANSWERS:
 {answer_summary}
 
 
-PARAMETERS (keep subtle, within these ranges):
-- brightness: 0.7 to 1.3 (1.0 = no change)
-- contrast: 0.7 to 1.3 (1.0 = no change)
-- saturation: 0.7 to 1.4 (1.0 = no change)
-- temperature: -30 to +30 (0 = neutral, negative = cooler, positive = warmer)
-- tint: -20 to +20 (0 = neutral)
-- grain: 0 to 0.25 (0 = none)
-- vignette: 0 to 0.35 (0 = none)
-- fade: 0 to 0.22 (0 = none)
+PARAMETERS (be creative, use the full range when appropriate):
+- brightness: 0.6 to 1.5 (1.0 = no change, lower = darker, higher = brighter)
+- contrast: 0.6 to 1.5 (1.0 = no change, lower = flatter, higher = punchier)
+- saturation: 0.3 to 1.8 (1.0 = no change, lower = muted, higher = vivid)
+- temperature: -40 to +40 (0 = neutral, negative = cool/blue, positive = warm/orange)
+- tint: -25 to +25 (0 = neutral, negative = green, positive = magenta)
+- grain: 0 to 0.4 (0 = none, higher = more film grain)
+- vignette: 0 to 0.6 (0 = none, higher = darker edges)
+- fade: 0 to 0.35 (0 = none, higher = lifted blacks/matte look)
 
 
 Brightness & Contrast: The foundation. Brightness sets the exposure; Contrast adds "pop" and depth.
@@ -75,16 +75,16 @@ Respond ONLY with valid JSON:
 }}"""
 
 
-# Parameter ranges for validation
+# Parameter ranges for validation - expanded for more creative freedom
 RANGES = {
-    "brightness": {"min": 0.85, "max": 1.15},
-    "contrast": {"min": 0.85, "max": 1.2},
-    "saturation": {"min": 0.7, "max": 1.4},
-    "temperature": {"min": -20, "max": 20},
-    "tint": {"min": -10, "max": 10},
-    "grain": {"min": 0, "max": 0.15},
-    "vignette": {"min": 0, "max": 0.35},
-    "fade": {"min": 0, "max": 0.12}
+    "brightness": {"min": 0.6, "max": 1.5},
+    "contrast": {"min": 0.6, "max": 1.5},
+    "saturation": {"min": 0.3, "max": 1.8},
+    "temperature": {"min": -40, "max": 40},
+    "tint": {"min": -25, "max": 25},
+    "grain": {"min": 0, "max": 0.4},
+    "vignette": {"min": 0, "max": 0.6},
+    "fade": {"min": 0, "max": 0.35}
 }
 
 
