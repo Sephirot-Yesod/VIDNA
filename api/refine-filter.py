@@ -11,7 +11,7 @@ import urllib.error
 
 # OpenRouter API configuration
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "google/gemini-3-pro-preview"
+MODEL = "google/gemini-2.0-flash-001"
 
 # Parameter ranges for validation - expanded for more creative freedom
 RANGES = {
