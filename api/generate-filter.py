@@ -6,11 +6,12 @@ Creates filter parameters from quiz answers using GPT-4o via OpenRouter
 from http.server import BaseHTTPRequestHandler
 import json
 import os
-import httpx
+import urllib.request
+import urllib.error
 
 # OpenRouter API configuration
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "openai/gpt-4o"
+MODEL = "google/gemini-3-pro-preview"
 
 
 def build_prompt(quiz_results: list, questions: list) -> str:
@@ -47,54 +48,18 @@ Temperature & Tint: The "White Balance." Temperature moves between Blue (Cool) a
 Fade, Grain & Vignette: The "Texture." These mimic old camera limitations to add character.
 
 Recipe 1: The "Moody Cinematic" Look
-This style is popular for street photography, portraits, and travel. It focuses on deep shadows and slightly desaturated colors to draw focus to the subject.
-
 The Vibe: Emotional, dramatic, serious.
-
-The Settings:
-
-Brightness: -10 to -20 (Slightly underexpose to preserve highlights).
-Contrast: +15 to +25 (Deepen the shadows).
-Saturation: -10 to -20 (Desaturate to remove distracting colors).
-Temperature: -5 to -10 (Cooler tones look more modern/cinematic).
-Tint: +5 (Adding a slight magenta tint can help skin tones in cool light).
-Grain: 0 (Keep it clean).
-Vignette: +15 (Draws the eye to the center).
-Fade: +10 (Lift the blacks slightly for a "matte" finish).
+Brightness: -10 to -20, Contrast: +15 to +25, Saturation: -10 to -20, Temperature: -5 to -10, Tint: +5, Grain: 0, Vignette: +15, Fade: +10
 
 Recipe 2: The "Vintage Film" Look
-This mimics the imperfections of analog film. It's great for casual photos, memories, and outdoor shots.
-
 The Vibe: Nostalgic, warm, soft.
+Brightness: +10, Contrast: -10 to -15, Saturation: -5, Temperature: +15 to +25, Tint: -5, Grain: +25 to +40, Vignette: +10, Fade: +30
 
-The Settings:
-
-Brightness: +10 (Film often looks slightly overexposed).
-Contrast: -10 to -15 (Flattens the image for a softer look).
-Saturation: -5 (Film colors are rarely neon-bright).
-Temperature: +15 to +25 (Warm/Yellow is key for that "golden hour" feel).
-Tint: -5 (A slight shift toward green mimics Fujifilm stocks).
-Grain: +25 to +40 (The most important setting here; adds texture).
-Vignette: +10 (Subtle lens darkening).
-Fade: +30 (Washes out the shadows significantly).
-
-Recipe 3: The "Modern Clean" Look (Influencer Style)
-This is the standard "bright and airy" look used for food, product, and lifestyle photography. It makes images look high-definition and happy.
-
+Recipe 3: The "Modern Clean" Look
 The Vibe: Sharp, energetic, true-to-life.
+Brightness: +20 to +30, Contrast: +10, Saturation: +10 to +15, Temperature: 0, Tint: 0, Grain: 0, Vignette: 0, Fade: 0
 
-The Settings:
-
-Brightness: +20 to +30 (Brighten it up significantly).
-Contrast: +10 (Adds definition back after brightening).
-Saturation: +10 to +15 (Makes colors pop, but don't overdo it).
-Temperature: 0 (Or slightly +5 if the original is too blue).
-Tint: 0 (Keep colors accurate).
-Grain: 0 (Digital clean look).
-Vignette: 0 (No dark corners).
-Fade: 0 (Keep blacks pure black for sharpness).
-
-In addition, Generate a gentle 2-3 word name.
+Generate a gentle 2-3 word name.
 
 Respond ONLY with valid JSON:
 {{
@@ -125,7 +90,7 @@ RANGES = {
 
 def clamp_value(value, range_def):
     """Clamp value to valid range"""
-    if not isinstance(value, (int, float)) or value != value:  # NaN check
+    if not isinstance(value, (int, float)) or value != value:
         return (range_def["min"] + range_def["max"]) / 2
     return max(range_def["min"], min(range_def["max"], value))
 
@@ -151,6 +116,38 @@ def parse_response(response_text: str) -> dict:
     }
 
 
+def call_openrouter(prompt: str, api_key: str) -> str:
+    """Call OpenRouter API using urllib (no external dependencies)"""
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "HTTP-Referer": "https://plart.vercel.app",
+        "X-Title": "Plart - Plant Photography Filter App"
+    }
+    
+    data = json.dumps({
+        "model": MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are an expert plant photography color grading specialist. Create tasteful, cohesive filters. Always respond with valid JSON only, no markdown formatting."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "temperature": 0.3,
+        "max_tokens": 250
+    }).encode('utf-8')
+    
+    req = urllib.request.Request(API_URL, data=data, headers=headers, method='POST')
+    
+    with urllib.request.urlopen(req, timeout=60) as response:
+        result = json.loads(response.read().decode('utf-8'))
+        return result["choices"][0]["message"]["content"]
+
+
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
@@ -172,43 +169,9 @@ class handler(BaseHTTPRequestHandler):
                 self.send_error_response(400, "Missing quizResults or questions")
                 return
             
-            # Build prompt
+            # Build prompt and call API
             prompt = build_prompt(quiz_results, questions)
-            
-            # Call OpenRouter API
-            with httpx.Client(timeout=60.0) as client:
-                response = client.post(
-                    API_URL,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {api_key}",
-                        "HTTP-Referer": os.environ.get("VERCEL_URL", "https://plart.vercel.app"),
-                        "X-Title": "Plart - Plant Photography Filter App"
-                    },
-                    json={
-                        "model": MODEL,
-                        "messages": [
-                            {
-                                "role": "system",
-                                "content": "You are an expert plant photography color grading specialist. Create tasteful, cohesive filters. Always respond with valid JSON only, no markdown formatting."
-                            },
-                            {
-                                "role": "user",
-                                "content": prompt
-                            }
-                        ],
-                        "temperature": 0.3,
-                        "max_tokens": 250
-                    }
-                )
-                
-                if response.status_code != 200:
-                    error_data = response.json()
-                    self.send_error_response(response.status_code, error_data.get("error", {}).get("message", "API request failed"))
-                    return
-                
-                result = response.json()
-                gpt_response = result["choices"][0]["message"]["content"]
+            gpt_response = call_openrouter(prompt, api_key)
             
             # Parse and validate response
             filter_params = parse_response(gpt_response)
@@ -220,6 +183,14 @@ class handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"success": True, "filter": filter_params}).encode())
             
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8')
+            try:
+                error_data = json.loads(error_body)
+                message = error_data.get("error", {}).get("message", str(e))
+            except:
+                message = str(e)
+            self.send_error_response(e.code, message)
         except json.JSONDecodeError as e:
             self.send_error_response(400, f"Invalid JSON: {str(e)}")
         except Exception as e:

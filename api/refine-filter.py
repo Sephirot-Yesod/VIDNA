@@ -6,11 +6,12 @@ Adjusts existing filter parameters based on text instructions using GPT-4o
 from http.server import BaseHTTPRequestHandler
 import json
 import os
-import httpx
+import urllib.request
+import urllib.error
 
 # OpenRouter API configuration
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "openai/gpt-4o"
+MODEL = "google/gemini-3-pro-preview"
 
 # Parameter ranges for validation
 RANGES = {
@@ -49,12 +50,12 @@ CURRENT FILTER PARAMETERS (these are the starting point):
 USER'S ADJUSTMENT REQUEST: "{instruction}"
 
 IMPORTANT: Make INCREMENTAL adjustments to the CURRENT values above. Do NOT start from scratch.
-- If they say "warmer", ADD to the current temperature (e.g., {current_params.get('temperature', 0)} + 5 to 15)
-- If they say "more contrast", INCREASE from current (e.g., {current_params.get('contrast', 1.0)} + 0.05 to 0.15)
+- If they say "warmer", ADD to the current temperature
+- If they say "more contrast", INCREASE from current
 - Only change parameters relevant to their request
 - Keep other parameters UNCHANGED from their current values
 
-Parameter ranges for reference:
+Parameter ranges:
 - brightness: 0.7 to 1.3
 - contrast: 0.7 to 1.3  
 - saturation: 0.7 to 1.4
@@ -64,7 +65,7 @@ Parameter ranges for reference:
 - vignette: 0 to 0.35
 - fade: 0 to 0.22
 
-Respond ONLY with valid JSON containing the ADJUSTED values:
+Respond ONLY with valid JSON:
 {{
   "brightness": {current_params.get('brightness', 1.0)},
   "contrast": {current_params.get('contrast', 1.0)},
@@ -97,6 +98,29 @@ def parse_response(response_text: str) -> dict:
     }
 
 
+def call_openrouter(prompt: str, api_key: str) -> str:
+    """Call OpenRouter API using urllib"""
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "HTTP-Referer": "https://plart.vercel.app",
+        "X-Title": "Plart - Plant Photography Filter App"
+    }
+    
+    data = json.dumps({
+        "model": MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3,
+        "max_tokens": 250
+    }).encode('utf-8')
+    
+    req = urllib.request.Request(API_URL, data=data, headers=headers, method='POST')
+    
+    with urllib.request.urlopen(req, timeout=60) as response:
+        result = json.loads(response.read().decode('utf-8'))
+        return result["choices"][0]["message"]["content"]
+
+
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
@@ -118,39 +142,9 @@ class handler(BaseHTTPRequestHandler):
                 self.send_error_response(400, "Missing currentParams or instruction")
                 return
             
-            # Build prompt
+            # Build prompt and call API
             prompt = build_refine_prompt(current_params, instruction)
-            
-            # Call OpenRouter API
-            with httpx.Client(timeout=60.0) as client:
-                response = client.post(
-                    API_URL,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {api_key}",
-                        "HTTP-Referer": os.environ.get("VERCEL_URL", "https://plart.vercel.app"),
-                        "X-Title": "Plart - Plant Photography Filter App"
-                    },
-                    json={
-                        "model": MODEL,
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": prompt
-                            }
-                        ],
-                        "temperature": 0.3,
-                        "max_tokens": 250
-                    }
-                )
-                
-                if response.status_code != 200:
-                    error_data = response.json()
-                    self.send_error_response(response.status_code, error_data.get("error", {}).get("message", "API request failed"))
-                    return
-                
-                result = response.json()
-                gpt_response = result["choices"][0]["message"]["content"]
+            gpt_response = call_openrouter(prompt, api_key)
             
             # Parse and validate response
             new_params = parse_response(gpt_response)
@@ -162,6 +156,14 @@ class handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"success": True, "params": new_params}).encode())
             
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8')
+            try:
+                error_data = json.loads(error_body)
+                message = error_data.get("error", {}).get("message", str(e))
+            except:
+                message = str(e)
+            self.send_error_response(e.code, message)
         except json.JSONDecodeError as e:
             self.send_error_response(400, f"Invalid JSON: {str(e)}")
         except Exception as e:

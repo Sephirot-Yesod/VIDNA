@@ -6,7 +6,8 @@ Analyzes a reference image and adjusts filter parameters to match its style usin
 from http.server import BaseHTTPRequestHandler
 import json
 import os
-import httpx
+import urllib.request
+import urllib.error
 
 # OpenRouter API configuration
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -69,7 +70,7 @@ Parameter ranges:
 - vignette: 0 to 0.35
 - fade: 0 to 0.22
 
-Respond ONLY with valid JSON containing the BLENDED values:
+Respond ONLY with valid JSON:
 {{
   "brightness": {current_params.get('brightness', 1.0)},
   "contrast": {current_params.get('contrast', 1.0)},
@@ -100,6 +101,37 @@ def parse_response(response_text: str) -> dict:
         "vignette": round(clamp_value(parsed.get("vignette", 0), RANGES["vignette"]), 2),
         "fade": round(clamp_value(parsed.get("fade", 0), RANGES["fade"]), 3)
     }
+
+
+def call_openrouter_vision(prompt: str, base64_image: str, api_key: str) -> str:
+    """Call OpenRouter API with vision using urllib"""
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "HTTP-Referer": "https://plart.vercel.app",
+        "X-Title": "Plart - Plant Photography Filter App"
+    }
+    
+    data = json.dumps({
+        "model": MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": base64_image}}
+                ]
+            }
+        ],
+        "temperature": 0.3,
+        "max_tokens": 300
+    }).encode('utf-8')
+    
+    req = urllib.request.Request(API_URL, data=data, headers=headers, method='POST')
+    
+    with urllib.request.urlopen(req, timeout=90) as response:
+        result = json.loads(response.read().decode('utf-8'))
+        return result["choices"][0]["message"]["content"]
 
 
 class handler(BaseHTTPRequestHandler):
@@ -136,50 +168,9 @@ class handler(BaseHTTPRequestHandler):
                     "fade": 0
                 }
             
-            # Build prompt
+            # Build prompt and call API
             prompt = build_vision_prompt(current_params)
-            
-            # Call OpenRouter API with vision
-            with httpx.Client(timeout=90.0) as client:
-                response = client.post(
-                    API_URL,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {api_key}",
-                        "HTTP-Referer": os.environ.get("VERCEL_URL", "https://plart.vercel.app"),
-                        "X-Title": "Plart - Plant Photography Filter App"
-                    },
-                    json={
-                        "model": MODEL,
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": prompt
-                                    },
-                                    {
-                                        "type": "image_url",
-                                        "image_url": {
-                                            "url": base64_image
-                                        }
-                                    }
-                                ]
-                            }
-                        ],
-                        "temperature": 0.3,
-                        "max_tokens": 300
-                    }
-                )
-                
-                if response.status_code != 200:
-                    error_data = response.json()
-                    self.send_error_response(response.status_code, error_data.get("error", {}).get("message", "API request failed"))
-                    return
-                
-                result = response.json()
-                gpt_response = result["choices"][0]["message"]["content"]
+            gpt_response = call_openrouter_vision(prompt, base64_image, api_key)
             
             # Parse and validate response
             new_params = parse_response(gpt_response)
@@ -191,6 +182,14 @@ class handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"success": True, "params": new_params}).encode())
             
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8')
+            try:
+                error_data = json.loads(error_body)
+                message = error_data.get("error", {}).get("message", str(e))
+            except:
+                message = str(e)
+            self.send_error_response(e.code, message)
         except json.JSONDecodeError as e:
             self.send_error_response(400, f"Invalid JSON: {str(e)}")
         except Exception as e:
