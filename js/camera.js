@@ -19,6 +19,11 @@ const Camera = (function() {
     let noiseCanvas = null;
     let noiseCtx = null;
 
+    // Temporal smoothing for noise reduction
+    let previousFrameData = null;
+    let smoothingEnabled = true;
+    const SMOOTHING_FACTOR = 0.15; // Blend 15% of previous frame for noise reduction
+
     /**
      * Initialize the camera module
      */
@@ -60,21 +65,50 @@ const Camera = (function() {
     }
 
     /**
-     * Start the camera
+     * Start the camera with optimized settings for iOS/mobile
      */
     async function start() {
         try {
+            // Optimized constraints for better quality on iOS
             const constraints = {
                 video: {
                     facingMode: facingMode,
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
+                    width: { ideal: 1920, min: 1280 },
+                    height: { ideal: 1080, min: 720 },
+                    // iOS and modern browsers support these for better quality
+                    frameRate: { ideal: 30, max: 30 },
+                    // Advanced constraints for noise reduction
+                    advanced: [
+                        { exposureMode: 'continuous' },
+                        { focusMode: 'continuous' },
+                        { whiteBalanceMode: 'continuous' }
+                    ]
                 },
                 audio: false
             };
 
-            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            // Try with advanced constraints first
+            try {
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (advancedError) {
+                // Fallback to simpler constraints if advanced not supported
+                console.log('Advanced constraints not supported, using basic');
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: facingMode,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                });
+            }
+
             elements.video.srcObject = stream;
+
+            // Apply iOS-specific video element optimizations
+            elements.video.setAttribute('playsinline', 'true');
+            elements.video.setAttribute('autoplay', 'true');
+            elements.video.setAttribute('muted', 'true');
 
             await new Promise((resolve) => {
                 elements.video.onloadedmetadata = () => {
@@ -82,6 +116,12 @@ const Camera = (function() {
                     resolve();
                 };
             });
+
+            // Log actual video resolution
+            console.log('Camera started:', elements.video.videoWidth, 'x', elements.video.videoHeight);
+
+            // Reset noise reduction state
+            previousFrameData = null;
 
             setupCanvases();
             startRenderLoop();
@@ -108,6 +148,17 @@ const Camera = (function() {
         }
 
         elements.video.srcObject = null;
+        previousFrameData = null; // Clear smoothing buffer
+    }
+
+    /**
+     * Toggle noise reduction / temporal smoothing
+     */
+    function toggleSmoothing() {
+        smoothingEnabled = !smoothingEnabled;
+        previousFrameData = null;
+        console.log('Noise reduction:', smoothingEnabled ? 'enabled' : 'disabled');
+        return smoothingEnabled;
     }
 
     /**
@@ -178,7 +229,10 @@ const Camera = (function() {
      * Start the render loop - ALL effects applied on canvas
      */
     function startRenderLoop() {
-        const ctx = elements.filterCanvas.getContext('2d');
+        const ctx = elements.filterCanvas.getContext('2d', { 
+            alpha: false,
+            willReadFrequently: true // Optimize for getImageData
+        });
         
         function render() {
             if (!stream) {
@@ -194,6 +248,11 @@ const Camera = (function() {
             // Draw video frame to canvas
             ctx.drawImage(video, 0, 0, width, height);
 
+            // Apply temporal smoothing (noise reduction) on mobile
+            if (smoothingEnabled && width > 0 && height > 0) {
+                applyTemporalSmoothing(ctx, width, height);
+            }
+
             // Apply filter if set
             if (currentFilter) {
                 applyAllFilters(ctx, width, height, currentFilter);
@@ -203,6 +262,39 @@ const Camera = (function() {
         }
 
         render();
+    }
+
+    /**
+     * Apply temporal smoothing to reduce video noise
+     * Blends current frame with previous frame
+     */
+    function applyTemporalSmoothing(ctx, width, height) {
+        const currentData = ctx.getImageData(0, 0, width, height);
+        const data = currentData.data;
+
+        if (previousFrameData && previousFrameData.length === data.length) {
+            const blend = SMOOTHING_FACTOR;
+            const invBlend = 1 - blend;
+
+            for (let i = 0; i < data.length; i += 4) {
+                // Only smooth if pixel values are similar (not for edges/motion)
+                const diffR = Math.abs(data[i] - previousFrameData[i]);
+                const diffG = Math.abs(data[i + 1] - previousFrameData[i + 1]);
+                const diffB = Math.abs(data[i + 2] - previousFrameData[i + 2]);
+                
+                // Only apply smoothing to low-difference pixels (noise, not motion)
+                if (diffR < 30 && diffG < 30 && diffB < 30) {
+                    data[i] = data[i] * invBlend + previousFrameData[i] * blend;
+                    data[i + 1] = data[i + 1] * invBlend + previousFrameData[i + 1] * blend;
+                    data[i + 2] = data[i + 2] * invBlend + previousFrameData[i + 2] * blend;
+                }
+            }
+
+            ctx.putImageData(currentData, 0, 0);
+        }
+
+        // Store current frame for next iteration
+        previousFrameData = new Uint8ClampedArray(data);
     }
 
     /**
@@ -426,6 +518,7 @@ const Camera = (function() {
         setFilter,
         capture,
         toggleParamsPanel,
+        toggleSmoothing,
         getFilter,
         isActive
     };

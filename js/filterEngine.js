@@ -1,6 +1,6 @@
 /**
  * Filter Engine Module - Plant Photography Edition
- * Uses OpenRouter to generate custom filter parameters from quiz answers
+ * Calls backend API for LLM-powered filter generation
  */
 
 const FilterEngine = (function() {
@@ -18,270 +18,74 @@ const FilterEngine = (function() {
 
     // Parameter ranges - subtle, never drastic
     const ranges = {
-        brightness: { min: 0.85, max: 1.15 },    // Very subtle brightness
-        contrast: { min: 0.85, max: 1.2 },       // Gentle contrast
-        saturation: { min: 0.7, max: 1.4 },      // Modest saturation range
-        temperature: { min: -20, max: 20 },      // Subtle warm/cool
-        tint: { min: -10, max: 10 },             // Minimal tint shifts
-        grain: { min: 0, max: 0.15 },            // Light grain only
-        vignette: { min: 0, max: 0.35 },         // Subtle vignette
-        fade: { min: 0, max: 0.12 }              // Very subtle fade
+        brightness: { min: 0.85, max: 1.15 },
+        contrast: { min: 0.85, max: 1.2 },
+        saturation: { min: 0.7, max: 1.4 },
+        temperature: { min: -20, max: 20 },
+        tint: { min: -10, max: 10 },
+        grain: { min: 0, max: 0.15 },
+        vignette: { min: 0, max: 0.35 },
+        fade: { min: 0, max: 0.12 }
     };
 
-    // API configuration - OpenRouter
-    const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-    const MODEL = 'openai/gpt-4o';
+    // API endpoints (relative URLs for Vercel serverless functions)
+    const API_ENDPOINTS = {
+        generateFilter: '/api/generate-filter',
+        refineFilter: '/api/refine-filter',
+        matchStyle: '/api/match-style'
+    };
 
     /**
-     * Get API key from config or localStorage fallback
+     * Get the base URL for API calls
+     * In development, this might need to be adjusted
      */
-    function getApiKey() {
-        if (typeof CONFIG !== 'undefined' && CONFIG.OPENROUTER_API_KEY && CONFIG.OPENROUTER_API_KEY.length > 10) {
-            console.log('API key loaded from config.js (length:', CONFIG.OPENROUTER_API_KEY.length, ')');
-            return CONFIG.OPENROUTER_API_KEY;
-        }
-        const localKey = localStorage.getItem('plart_openrouter_key');
-        if (localKey) {
-            console.log('API key loaded from localStorage');
-            return localKey;
-        }
-        console.warn('No API key found in config.js or localStorage');
-        return null;
+    function getApiBaseUrl() {
+        // Use relative URLs - works both locally and on Vercel
+        return '';
     }
 
     /**
-     * Set API key (saves to localStorage as fallback)
+     * Make API call with retry logic
      */
-    function setApiKey(key) {
-        localStorage.setItem('plart_openrouter_key', key);
-    }
-
-    /**
-     * Check if API key is set
-     */
-    function hasApiKey() {
-        const key = getApiKey();
-        return key && key.length > 10;
-    }
-
-    /**
-     * Check if key is from config file
-     */
-    function isKeyFromConfig() {
-        return typeof CONFIG !== 'undefined' && CONFIG.OPENROUTER_API_KEY && CONFIG.OPENROUTER_API_KEY.length > 10;
-    }
-
-    /**
-     * Build the prompt for GPT - Plant Photography Specialist
-     */
-    function buildPrompt(quizResults, questions) {
-        const answerSummary = quizResults.map((result, index) => {
-            const question = questions[index];
-            const selectedOption = question.options.find(opt => opt.value === result.answer);
-            return `Q${index + 1}: "${question.text}" → "${selectedOption.label}" (${selectedOption.description})`;
-        }).join('\n');
-
-        return `You are an expert plant photography specialist. Based on the user's answers about their aesthetic preferences, create a great looking photo filter.
-
-USER'S ANSWERS:
-${answerSummary}
-
-
-PARAMETERS (keep subtle, within these ranges):
-- brightness: 0.7 to 1.3 (1.0 = no change)
-- contrast: 0.7 to 1.3 (1.0 = no change)
-- saturation: 0.7 to 1.4 (1.0 = no change)
-- temperature: -30 to +30 (0 = neutral, negative = cooler, positive = warmer)
-- tint: -20 to +20 (0 = neutral)
-- grain: 0 to 0.25 (0 = none)
-- vignette: 0 to 0.35 (0 = none)
-- fade: 0 to 0.22 (0 = none)
-
-
-Brightness & Contrast: The foundation. Brightness sets the exposure; Contrast adds "pop" and depth.
-
-Saturation: Controls color intensity. Pro tip: Lower saturation often looks more expensive/cinematic.
-
-Temperature & Tint: The "White Balance." Temperature moves between Blue (Cool) and Yellow (Warm). Tint moves between Green and Magenta.
-
-Fade, Grain & Vignette: The "Texture." These mimic old camera limitations to add character.
-
-Recipe 1: The "Moody Cinematic" Look
-This style is popular for street photography, portraits, and travel. It focuses on deep shadows and slightly desaturated colors to draw focus to the subject.
-
-The Vibe: Emotional, dramatic, serious.
-
-The Settings:
-
-Brightness: -10 to -20 (Slightly underexpose to preserve highlights).
-
-Contrast: +15 to +25 (Deepen the shadows).
-
-Saturation: -10 to -20 (Desaturate to remove distracting colors).
-
-Temperature: -5 to -10 (Cooler tones look more modern/cinematic).
-
-Tint: +5 (Adding a slight magenta tint can help skin tones in cool light).
-
-Grain: 0 (Keep it clean).
-
-Vignette: +15 (Draws the eye to the center).
-
-Fade: +10 (Lift the blacks slightly for a "matte" finish).
-
-Recipe 2: The "Vintage Film" Look
-This mimics the imperfections of analog film. It’s great for casual photos, memories, and outdoor shots.
-
-The Vibe: Nostalgic, warm, soft.
-
-The Settings:
-
-Brightness: +10 (Film often looks slightly overexposed).
-
-Contrast: -10 to -15 (Flattens the image for a softer look).
-
-Saturation: -5 (Film colors are rarely neon-bright).
-
-Temperature: +15 to +25 (Warm/Yellow is key for that "golden hour" feel).
-
-Tint: -5 (A slight shift toward green mimics Fujifilm stocks).
-
-Grain: +25 to +40 (The most important setting here; adds texture).
-
-Vignette: +10 (Subtle lens darkening).
-
-Fade: +30 (Washes out the shadows significantly).
-
-Recipe 3: The "Modern Clean" Look (Influencer Style)
-This is the standard "bright and airy" look used for food, product, and lifestyle photography. It makes images look high-definition and happy.
-
-The Vibe: Sharp, energetic, true-to-life.
-
-The Settings:
-
-Brightness: +20 to +30 (Brighten it up significantly).
-
-Contrast: +10 (Adds definition back after brightening).
-
-Saturation: +10 to +15 (Makes colors pop, but don't overdo it).
-
-Temperature: 0 (Or slightly +5 if the original is too blue).
-
-Tint: 0 (Keep colors accurate).
-
-Grain: 0 (Digital clean look).
-
-Vignette: 0 (No dark corners).
-
-Fade: 0 (Keep blacks pure black for sharpness).
-
-In addition, Generate a gentle 2-3 word name.
-
-Respond ONLY with valid JSON:
-{
-  "name": "Filter Name",
-  "brightness": 1.0,
-  "contrast": 1.0,
-  "saturation": 1.0,
-  "temperature": 0,
-  "tint": 0,
-  "grain": 0,
-  "vignette": 0,
-  "fade": 0
-}`;
-    }
-
-    /**
-     * Call OpenRouter API to generate filter
-     */
-    async function callGPT(prompt, retries = 2) {
-        const apiKey = getApiKey();
-        
-        if (!apiKey) {
-            throw new Error('API key not set');
-        }
-
+    async function callApi(endpoint, body, retries = 2) {
+        const url = getApiBaseUrl() + endpoint;
         let lastError;
-        
+
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
                 if (attempt > 0) {
                     console.log(`Retry attempt ${attempt}/${retries}...`);
-                    await new Promise(r => setTimeout(r, 1000 * attempt)); // Exponential backoff
+                    await new Promise(r => setTimeout(r, 1000 * attempt));
                 }
 
-                const response = await fetch(API_URL, {
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`,
-                        'HTTP-Referer': window.location.origin,
-                        'X-Title': 'Plart - Plant Photography Filter App'
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        model: MODEL,
-                        messages: [
-                            {
-                                role: 'system',
-                                content: 'You are an expert plant photography color grading specialist. Create tasteful, cohesive filters. Always respond with valid JSON only, no markdown formatting.'
-                            },
-                            {
-                                role: 'user',
-                                content: prompt
-                            }
-                        ],
-                        temperature: 0.3,  // Conservative, consistent outputs
-                        max_tokens: 250
-                    })
+                    body: JSON.stringify(body)
                 });
 
-                if (!response.ok) {
-                    const error = await response.json();
-                    console.error('OpenRouter API error:', error);
-                    throw new Error(error.error?.message || `API request failed (${response.status})`);
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || `API request failed (${response.status})`);
                 }
 
-                const data = await response.json();
-                return data.choices[0].message.content;
-                
+                return data;
+
             } catch (error) {
                 lastError = error;
                 console.error(`API call attempt ${attempt + 1} failed:`, error.message);
-                
+
                 // Don't retry on auth errors
                 if (error.message.includes('401') || error.message.includes('403')) {
                     throw error;
                 }
             }
         }
-        
+
         throw lastError;
-    }
-
-    /**
-     * Parse and validate GPT response
-     */
-    function parseGPTResponse(responseText) {
-        let cleaned = responseText.trim();
-        if (cleaned.startsWith('```')) {
-            cleaned = cleaned.replace(/```json?\n?/g, '').replace(/```/g, '');
-        }
-
-        const parsed = JSON.parse(cleaned);
-
-        const filter = {
-            name: parsed.name || 'Botanical Custom',
-            brightness: clampValue(parsed.brightness, ranges.brightness),
-            contrast: clampValue(parsed.contrast, ranges.contrast),
-            saturation: clampValue(parsed.saturation, ranges.saturation),
-            temperature: clampValue(parsed.temperature, ranges.temperature),
-            tint: clampValue(parsed.tint, ranges.tint),
-            grain: clampValue(parsed.grain, ranges.grain),
-            vignette: clampValue(parsed.vignette, ranges.vignette),
-            fade: clampValue(parsed.fade, ranges.fade)
-        };
-
-        return filter;
     }
 
     /**
@@ -295,31 +99,47 @@ Respond ONLY with valid JSON:
     }
 
     /**
-     * Calculate filter parameters from quiz results using GPT
+     * Ensure filter params are valid
+     */
+    function ensureValidParams(params) {
+        return {
+            name: params.name || 'Custom Filter',
+            brightness: clampValue(params.brightness, ranges.brightness),
+            contrast: clampValue(params.contrast, ranges.contrast),
+            saturation: clampValue(params.saturation, ranges.saturation),
+            temperature: clampValue(params.temperature, ranges.temperature),
+            tint: clampValue(params.tint, ranges.tint),
+            grain: clampValue(params.grain, ranges.grain),
+            vignette: clampValue(params.vignette, ranges.vignette),
+            fade: clampValue(params.fade, ranges.fade)
+        };
+    }
+
+    /**
+     * Calculate filter parameters from quiz results using backend API
      */
     async function calculateFilter(quizResults, questions) {
-        const prompt = buildPrompt(quizResults, questions);
-        
         console.log('=== QUIZ ANSWERS ===');
         quizResults.forEach((r, i) => {
             const q = questions[i];
             const selected = q.options.find(o => o.value === r.answer);
             console.log(`Q${i + 1}: ${selected?.label || r.answer}`);
         });
-        
+
         try {
-            const response = await callGPT(prompt);
-            const filter = parseGPTResponse(response);
-            
-            // Round values for cleaner display
-            filter.brightness = Math.round(filter.brightness * 100) / 100;
-            filter.contrast = Math.round(filter.contrast * 100) / 100;
-            filter.saturation = Math.round(filter.saturation * 100) / 100;
-            filter.temperature = Math.round(filter.temperature);
-            filter.tint = Math.round(filter.tint);
-            filter.grain = Math.round(filter.grain * 1000) / 1000;
-            filter.vignette = Math.round(filter.vignette * 100) / 100;
-            filter.fade = Math.round(filter.fade * 1000) / 1000;
+            const data = await callApi(API_ENDPOINTS.generateFilter, {
+                quizResults: quizResults,
+                questions: questions.map(q => ({
+                    text: q.text,
+                    options: q.options.map(o => ({
+                        value: o.value,
+                        label: o.label,
+                        description: o.description
+                    }))
+                }))
+            });
+
+            const filter = ensureValidParams(data.filter);
 
             // Log the generated filter
             console.log('=== GENERATED FILTER ===');
@@ -336,53 +156,48 @@ Respond ONLY with valid JSON:
 
             return filter;
         } catch (error) {
-            console.error('GPT filter generation failed:', error);
-            throw error;
+            console.error('Filter generation failed:', error);
+            // Fall back to deterministic algorithm
+            console.log('Falling back to deterministic filter generation...');
+            return calculateFilterFallback(quizResults);
         }
     }
 
     /**
      * Fallback: Calculate filter using deterministic algorithm
-     * Based on 5 questions about light, mood, and photography preferences
      */
     function calculateFilterFallback(quizResults) {
         const answers = quizResults.map(r => r.answer);
-        
-        const light = answers[0];      // 1=morning soft, 2=bright sunny, 3=afternoon warm, 4=overcast
-        const feeling = answers[1];    // 1=quiet, 2=calm alive, 3=fresh energetic, 4=low-key
-        const background = answers[2]; // 1-4, higher = wants more focus
-        const moment = answers[3];     // 1=new growth, 2=textures, 3=balanced, 4=change
-        const comfort = answers[4];    // 1=soft, 2=clean, 3=bright colors, 4=subtle
 
-        // Moderate intensity for natural results
+        const light = answers[0];
+        const feeling = answers[1];
+        const background = answers[2];
+        const moment = answers[3];
+        const comfort = answers[4];
+
         const intensity = 0.7;
 
-        // Temperature based on light preference
         let temperature = 0;
-        if (light === 1) temperature = 8;       // Morning = slightly warm
-        else if (light === 2) temperature = 0;  // Midday = neutral
-        else if (light === 3) temperature = 12; // Afternoon = warm
-        else if (light === 4) temperature = -5; // Overcast = slightly cool
+        if (light === 1) temperature = 8;
+        else if (light === 2) temperature = 0;
+        else if (light === 3) temperature = 12;
+        else if (light === 4) temperature = -5;
 
-        // Brightness and contrast based on feeling
         let brightness = 1.0;
         let contrast = 1.0;
-        if (feeling === 1) { brightness = 0.95; contrast = 0.92; }      // Quiet
-        else if (feeling === 2) { brightness = 1.02; contrast = 1.0; }  // Calm alive
-        else if (feeling === 3) { brightness = 1.08; contrast = 1.05; } // Fresh energetic
-        else if (feeling === 4) { brightness = 0.98; contrast = 0.95; } // Low-key
+        if (feeling === 1) { brightness = 0.95; contrast = 0.92; }
+        else if (feeling === 2) { brightness = 1.02; contrast = 1.0; }
+        else if (feeling === 3) { brightness = 1.08; contrast = 1.05; }
+        else if (feeling === 4) { brightness = 0.98; contrast = 0.95; }
 
-        // Saturation based on comfort preference
         let saturation = 1.0;
-        if (comfort === 1) saturation = 0.9;       // Soft
-        else if (comfort === 2) saturation = 1.0;  // Clean
-        else if (comfort === 3) saturation = 1.15; // Bright colors
-        else if (comfort === 4) saturation = 0.85; // Subtle
+        if (comfort === 1) saturation = 0.9;
+        else if (comfort === 2) saturation = 1.0;
+        else if (comfort === 3) saturation = 1.15;
+        else if (comfort === 4) saturation = 0.85;
 
-        // Vignette based on background preference
         const vignette = (background - 1) * 0.08;
 
-        // Contrast boost for texture lovers
         if (moment === 2) contrast += 0.05;
 
         return {
@@ -399,11 +214,72 @@ Respond ONLY with valid JSON:
     }
 
     /**
+     * Refine an existing filter based on text instructions using backend API
+     */
+    async function refineFilterWithText(currentParams, instruction) {
+        try {
+            const data = await callApi(API_ENDPOINTS.refineFilter, {
+                currentParams: currentParams,
+                instruction: instruction
+            });
+
+            const newParams = ensureValidParams(data.params);
+
+            console.log('=== REFINED FILTER ===');
+            console.log('Instruction:', instruction);
+            console.log('Original params:', currentParams);
+            console.log('Adjusted params:', newParams);
+            console.log('======================');
+
+            return newParams;
+        } catch (error) {
+            console.error('Filter refinement failed:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Analyze an image and adjust current filter parameters to incorporate its style
+     * Uses backend API with GPT-4o Vision
+     */
+    async function matchImageStyle(base64Image, currentParams = null) {
+        const params = currentParams || {
+            brightness: 1.0,
+            contrast: 1.0,
+            saturation: 1.0,
+            temperature: 0,
+            tint: 0,
+            grain: 0,
+            vignette: 0,
+            fade: 0
+        };
+
+        try {
+            const data = await callApi(API_ENDPOINTS.matchStyle, {
+                currentParams: params,
+                image: base64Image
+            });
+
+            const newParams = ensureValidParams(data.params);
+
+            console.log('=== IMAGE STYLE MATCH ===');
+            console.log('Original params:', params);
+            console.log('Blended params:', newParams);
+            console.log('=========================');
+
+            return newParams;
+        } catch (error) {
+            console.error('Image style matching failed:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Generate a CSS filter string for basic filters
      */
     function toCSSFilter(filter) {
         const parts = [];
-        
+
         if (filter.brightness !== 1.0) {
             parts.push(`brightness(${filter.brightness})`);
         }
@@ -413,8 +289,7 @@ Respond ONLY with valid JSON:
         if (filter.saturation !== 1.0) {
             parts.push(`saturate(${filter.saturation})`);
         }
-        
-        // Temperature approximation
+
         if (filter.temperature > 0) {
             const sepiaAmount = Math.min(filter.temperature / 80, 0.4);
             parts.push(`sepia(${sepiaAmount})`);
@@ -463,50 +338,50 @@ Respond ONLY with valid JSON:
      */
     function getParameterDisplay(filter) {
         return [
-            { 
-                name: 'Brightness', 
+            {
+                name: 'Brightness',
                 value: filter.brightness,
                 displayValue: `${Math.round((filter.brightness - 1) * 100)}%`,
                 icon: '☀️'
             },
-            { 
-                name: 'Contrast', 
+            {
+                name: 'Contrast',
                 value: filter.contrast,
                 displayValue: `${Math.round((filter.contrast - 1) * 100)}%`,
                 icon: '◐'
             },
-            { 
-                name: 'Saturation', 
+            {
+                name: 'Saturation',
                 value: filter.saturation,
                 displayValue: `${Math.round((filter.saturation - 1) * 100)}%`,
                 icon: '🌿'
             },
-            { 
-                name: 'Temperature', 
+            {
+                name: 'Temperature',
                 value: filter.temperature,
                 displayValue: filter.temperature > 0 ? `+${filter.temperature}` : `${filter.temperature}`,
                 icon: filter.temperature >= 0 ? '🌅' : '🌲'
             },
-            { 
-                name: 'Tint', 
+            {
+                name: 'Tint',
                 value: filter.tint,
                 displayValue: filter.tint > 0 ? `+${filter.tint}` : `${filter.tint}`,
                 icon: '🌸'
             },
-            { 
-                name: 'Grain', 
+            {
+                name: 'Grain',
                 value: filter.grain,
                 displayValue: `${Math.round(filter.grain * 100)}%`,
                 icon: '📽️'
             },
-            { 
-                name: 'Vignette', 
+            {
+                name: 'Vignette',
                 value: filter.vignette,
                 displayValue: `${Math.round(filter.vignette * 100)}%`,
                 icon: '🎯'
             },
-            { 
-                name: 'Fade', 
+            {
+                name: 'Fade',
                 value: filter.fade,
                 displayValue: `${Math.round(filter.fade * 100)}%`,
                 icon: '🌫️'
@@ -514,200 +389,24 @@ Respond ONLY with valid JSON:
         ];
     }
 
-    /**
-     * Refine an existing filter based on text instructions
-     */
-    async function refineFilterWithText(currentParams, instruction) {
-        const prompt = `You are a photo filter expert. The user has an existing filter and wants to ADJUST it based on their feedback.
-
-CURRENT FILTER PARAMETERS (these are the starting point):
-- brightness: ${currentParams.brightness}
-- contrast: ${currentParams.contrast}
-- saturation: ${currentParams.saturation}
-- temperature: ${currentParams.temperature}
-- tint: ${currentParams.tint}
-- grain: ${currentParams.grain}
-- vignette: ${currentParams.vignette}
-- fade: ${currentParams.fade}
-
-USER'S ADJUSTMENT REQUEST: "${instruction}"
-
-IMPORTANT: Make INCREMENTAL adjustments to the CURRENT values above. Do NOT start from scratch.
-- If they say "warmer", ADD to the current temperature (e.g., ${currentParams.temperature} + 5 to 15)
-- If they say "more contrast", INCREASE from current (e.g., ${currentParams.contrast} + 0.05 to 0.15)
-- Only change parameters relevant to their request
-- Keep other parameters UNCHANGED from their current values
-
-Parameter ranges for reference:
-- brightness: 0.7 to 1.3
-- contrast: 0.7 to 1.3  
-- saturation: 0.7 to 1.4
-- temperature: -30 to +30
-- tint: -20 to +20
-- grain: 0 to 0.25
-- vignette: 0 to 0.35
-- fade: 0 to 0.22
-
-Respond ONLY with valid JSON containing the ADJUSTED values:
-{
-  "brightness": ${currentParams.brightness},
-  "contrast": ${currentParams.contrast},
-  "saturation": ${currentParams.saturation},
-  "temperature": ${currentParams.temperature},
-  "tint": ${currentParams.tint},
-  "grain": ${currentParams.grain},
-  "vignette": ${currentParams.vignette},
-  "fade": ${currentParams.fade}
-}`;
-
-        try {
-            const response = await callGPT(prompt);
-            const newParams = parseGPTResponse(response);
-            
-            // Remove the name field for param-only response
-            delete newParams.name;
-            
-            console.log('=== REFINED FILTER ===');
-            console.log('Instruction:', instruction);
-            console.log('Original params:', currentParams);
-            console.log('Adjusted params:', newParams);
-            console.log('======================');
-            
-            return newParams;
-        } catch (error) {
-            console.error('Filter refinement failed:', error);
-            throw error;
-        }
+    // Legacy API key functions - kept for backwards compatibility but no longer used
+    function getApiKey() {
+        console.warn('getApiKey() is deprecated - API calls now go through backend');
+        return null;
     }
 
-    /**
-     * Analyze an image and adjust current filter parameters to incorporate its style
-     * Uses GPT-4o Vision API
-     * @param {string} base64Image - Base64 encoded image
-     * @param {Object} currentParams - Current filter parameters to adjust
-     */
-    async function matchImageStyle(base64Image, currentParams = null) {
-        const apiKey = getApiKey();
-        
-        if (!apiKey) {
-            throw new Error('API key not set');
-        }
+    function setApiKey(key) {
+        console.warn('setApiKey() is deprecated - API key is now stored on backend');
+    }
 
-        // Default params if none provided
-        const params = currentParams || {
-            brightness: 1.0,
-            contrast: 1.0,
-            saturation: 1.0,
-            temperature: 0,
-            tint: 0,
-            grain: 0,
-            vignette: 0,
-            fade: 0
-        };
+    function hasApiKey() {
+        // Always return true since API key is on backend
+        return true;
+    }
 
-        const prompt = `Analyze this reference image's color grading, mood, and visual style. Then ADJUST the user's current filter to incorporate elements of this style.
-
-CURRENT FILTER PARAMETERS (starting point):
-- brightness: ${params.brightness}
-- contrast: ${params.contrast}
-- saturation: ${params.saturation}
-- temperature: ${params.temperature}
-- tint: ${params.tint}
-- grain: ${params.grain}
-- vignette: ${params.vignette}
-- fade: ${params.fade}
-
-Analyze the reference image for:
-- Overall brightness and exposure
-- Color temperature (warm/cool)
-- Saturation levels
-- Contrast and tonal range
-- Any vintage/film effects (grain, fade)
-- Vignetting
-
-IMPORTANT: Make INCREMENTAL adjustments to blend the reference image's style INTO the current filter.
-- Don't completely replace the current values
-- Shift parameters TOWARD the reference style by 30-60% of the difference
-- Preserve some of the original filter's character
-
-Parameter ranges:
-- brightness: 0.7 to 1.3
-- contrast: 0.7 to 1.3
-- saturation: 0.7 to 1.4
-- temperature: -30 to +30
-- tint: -20 to +20
-- grain: 0 to 0.25
-- vignette: 0 to 0.35
-- fade: 0 to 0.22
-
-Respond ONLY with valid JSON containing the BLENDED values:
-{
-  "brightness": ${params.brightness},
-  "contrast": ${params.contrast},
-  "saturation": ${params.saturation},
-  "temperature": ${params.temperature},
-  "tint": ${params.tint},
-  "grain": ${params.grain},
-  "vignette": ${params.vignette},
-  "fade": ${params.fade}
-}`;
-
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`,
-                    'HTTP-Referer': window.location.origin,
-                    'X-Title': 'Plart - Plant Photography Filter App'
-                },
-                body: JSON.stringify({
-                    model: MODEL,
-                    messages: [
-                        {
-                            role: 'user',
-                            content: [
-                                {
-                                    type: 'text',
-                                    text: prompt
-                                },
-                                {
-                                    type: 'image_url',
-                                    image_url: {
-                                        url: base64Image
-                                    }
-                                }
-                            ]
-                        }
-                    ],
-                    temperature: 0.3,
-                    max_tokens: 300
-                })
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                console.error('OpenRouter Vision API error:', error);
-                throw new Error(error.error?.message || `API request failed (${response.status})`);
-            }
-
-            const data = await response.json();
-            const responseText = data.choices[0].message.content;
-            const newParams = parseGPTResponse(responseText);
-            
-            // Remove the name field
-            delete newParams.name;
-            
-            console.log('=== IMAGE STYLE MATCH ===');
-            console.log('Original params:', params);
-            console.log('Blended params:', newParams);
-            console.log('=========================');
-            
-            return newParams;
-        } catch (error) {
-            console.error('Image style matching failed:', error);
-            throw error;
-        }
+    function isKeyFromConfig() {
+        // Always return true since API key is on backend
+        return true;
     }
 
     // Public API

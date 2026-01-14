@@ -1,5 +1,10 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": ".",
-  "framework": null
+  "framework": null,
+  "functions": {
+    "api/*.py": {
+      "runtime": "python3.11"
+    }
+  }
 }
