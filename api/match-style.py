@@ -108,8 +108,8 @@ def call_openrouter_vision(prompt: str, base64_image: str, api_key: str) -> str:
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": "https://plart.vercel.app",
-        "X-Title": "Plart - Plant Photography Filter App"
+        "HTTP-Referer": "https://vidna.vercel.app",
+        "X-Title": "VIDNA - Photo Filter App"
     }
     
     data = json.dumps({
@@ -130,17 +130,50 @@ def call_openrouter_vision(prompt: str, base64_image: str, api_key: str) -> str:
     req = urllib.request.Request(API_URL, data=data, headers=headers, method='POST')
     
     with urllib.request.urlopen(req, timeout=90) as response:
-        result = json.loads(response.read().decode('utf-8'))
-        return result["choices"][0]["message"]["content"]
+        response_body = response.read().decode('utf-8')
+        result = json.loads(response_body)
+        
+        if "error" in result:
+            raise Exception(f"OpenRouter error: {result['error']}")
+        
+        if "choices" not in result or len(result["choices"]) == 0:
+            raise Exception(f"No choices in response: {response_body[:500]}")
+        
+        content = result["choices"][0]["message"]["content"]
+        if not content:
+            raise Exception("Empty content in response")
+        
+        return content
 
 
 class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        """Return API info for browser visits"""
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        info = {
+            "endpoint": "/api/match-style",
+            "method": "POST",
+            "description": "Match filter to reference image style using AI vision",
+            "body": {
+                "currentParams": "{brightness, contrast, ...} (optional)",
+                "image": "data:image/jpeg;base64,..."
+            }
+        }
+        self.wfile.write(json.dumps(info, indent=2).encode())
+
     def do_POST(self):
         try:
             # Get API key from environment
             api_key = os.environ.get("OPENROUTER_API_KEY")
             if not api_key:
-                self.send_error_response(500, "API key not configured")
+                self.send_error_response(500, "OPENROUTER_API_KEY not set in environment variables")
+                return
+            
+            if len(api_key) < 10:
+                self.send_error_response(500, f"API key appears invalid (length: {len(api_key)})")
                 return
             
             # Parse request body
@@ -188,8 +221,10 @@ class handler(BaseHTTPRequestHandler):
                 error_data = json.loads(error_body)
                 message = error_data.get("error", {}).get("message", str(e))
             except:
-                message = str(e)
+                message = f"HTTP {e.code}: {error_body[:200]}"
             self.send_error_response(e.code, message)
+        except urllib.error.URLError as e:
+            self.send_error_response(500, f"Network error: {str(e)}")
         except json.JSONDecodeError as e:
             self.send_error_response(400, f"Invalid JSON: {str(e)}")
         except Exception as e:
