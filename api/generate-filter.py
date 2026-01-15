@@ -207,7 +207,7 @@ class handler(BaseHTTPRequestHandler):
             "method": "POST",
             "description": "Generate photo filter parameters from quiz answers",
             "body": {
-                "quizResults": "[{questionId, answer, affects}]",
+                "quizResults": "[{questionId, answer}]",
                 "questions": "[{text, options: [{value, label, description}]}]"
             }
         }

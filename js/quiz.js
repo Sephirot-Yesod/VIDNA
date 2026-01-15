@@ -28,8 +28,7 @@ const Quiz = (function() {
                     description: "Focused connection", 
                     value: 3 
                 }
-            ],
-            affects: ["brightness", "vignette"]
+            ]
         },
         {
             id: 2,
@@ -54,8 +53,7 @@ const Quiz = (function() {
                     description: "True to life", 
                     value: 3 
                 }
-            ],
-            affects: ["temperature", "grain"]
+            ]
         },
         {
             id: 3,
@@ -80,8 +78,7 @@ const Quiz = (function() {
                     description: "Artistic and creative", 
                     value: 3 
                 }
-            ],
-            affects: ["contrast", "fade", "tint"]
+            ]
         },
         {
             id: 4,
@@ -106,8 +103,7 @@ const Quiz = (function() {
                     description: "Warm and balanced", 
                     value: 3 
                 }
-            ],
-            affects: ["saturation"]
+            ]
         },
         {
             id: 5,
@@ -132,8 +128,7 @@ const Quiz = (function() {
                     description: "Cozy and warm", 
                     value: 3 
                 }
-            ],
-            affects: ["tint", "temperature"]
+            ]
         }
     ];
 
@@ -299,8 +294,7 @@ const Quiz = (function() {
     function completeQuiz() {
         const results = questions.map((q, i) => ({
             questionId: q.id,
-            answer: answers[i],
-            affects: q.affects
+            answer: answers[i]
         }));
 
         if (onCompleteCallback) {

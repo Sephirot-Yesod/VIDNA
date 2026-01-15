@@ -100,11 +100,11 @@ For production deployments with rate limiting, consider adding JWT authenticatio
 ```json
 {
   "quizResults": [
-    { "questionId": 1, "answer": 2, "affects": ["brightness", "vignette"] },
-    { "questionId": 2, "answer": 1, "affects": ["temperature", "grain"] },
-    { "questionId": 3, "answer": 3, "affects": ["contrast", "fade", "tint"] },
-    { "questionId": 4, "answer": 2, "affects": ["saturation"] },
-    { "questionId": 5, "answer": 3, "affects": ["tint", "temperature"] }
+    { "questionId": 1, "answer": 2 },
+    { "questionId": 2, "answer": 1 },
+    { "questionId": 3, "answer": 3 },
+    { "questionId": 4, "answer": 2 },
+    { "questionId": 5, "answer": 3 }
   ],
   "questions": [
     {
@@ -153,7 +153,7 @@ For production deployments with rate limiting, consider adding JWT authenticatio
 curl -X POST https://vidna.vercel.app/api/generate-filter \
   -H "Content-Type: application/json" \
   -d '{
-    "quizResults": [{"questionId": 1, "answer": 2, "affects": ["brightness"]}],
+    "quizResults": [{"questionId": 1, "answer": 2}],
     "questions": [{"text": "Question 1", "options": [{"value": 1, "label": "A", "description": "Desc A"}, {"value": 2, "label": "B", "description": "Desc B"}]}]
   }'
 ```
